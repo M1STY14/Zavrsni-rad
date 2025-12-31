@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const { createMerkleTree, generateMerkleProof } = require('./komponente/merkle.js');
+const { createMerkleTree, generateMerkleProof } = require('./components/merkle.js');
 const Client = require('bitcoin-core');
 
 const app = express();
