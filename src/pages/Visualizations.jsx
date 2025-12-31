@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import '../App.css';
 import VisualizacijaStabla from '../components/VisualizacijaStabla.jsx';
+import VisualizacijaStabla3D from '../components/VisualizacijaStabla3D.jsx';
 import { getBitcoinBlock } from '../api.js';
 
 const Visualizations = () => {
@@ -12,6 +13,7 @@ const Visualizations = () => {
     const [singleTransaction, setSingleTransaction] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [view3D, setView3D] = useState(true); // Default to 3D view
 
     const handleSubmit = async () => {
         setLoading(true);
@@ -127,7 +129,7 @@ const Visualizations = () => {
                     </label>
                 </div>
 
-                <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
                     <button onClick={handleSubmit} disabled={loading}>
                         {loading ? 'Učitavanje...' : 'Generiraj stablo'}
                     </button>
@@ -139,6 +141,17 @@ const Visualizations = () => {
                         }}
                     >
                         Očisti
+                    </button>
+                    <button
+                        onClick={() => setView3D(!view3D)}
+                        style={{
+                            background: view3D
+                                ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                                : 'linear-gradient(135deg, rgba(102,126,234,0.3) 0%, rgba(118,75,162,0.3) 100%)',
+                            border: '2px solid rgba(102,126,234,0.5)'
+                        }}
+                    >
+                        {view3D ? '🌐 3D Prikaz' : '📊 2D Prikaz'}
                     </button>
                 </div>
             </div>
@@ -176,9 +189,15 @@ const Visualizations = () => {
                 </div>
             )}
 
-            <div className="Visualization-canvas">
+            <div className="Visualization-canvas" style={{
+                background: view3D ? '#000' : 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(240, 248, 255, 0.95) 100%)'
+            }}>
                 {data ? (
-                    <VisualizacijaStabla data={data} />
+                    view3D ? (
+                        <VisualizacijaStabla3D data={data} />
+                    ) : (
+                        <VisualizacijaStabla data={data} />
+                    )
                 ) : (
                     <div style={{
                         display: 'flex',
@@ -186,13 +205,16 @@ const Visualizations = () => {
                         alignItems: 'center',
                         justifyContent: 'center',
                         height: '100%',
-                        color: '#666'
+                        color: view3D ? '#00d4ff' : '#666'
                     }}>
                         <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                             <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
-                        <p style={{ marginTop: '1.5rem', fontSize: '1.2rem', color: '#999' }}>
+                        <p style={{ marginTop: '1.5rem', fontSize: '1.2rem', color: view3D ? '#00d4ff' : '#999' }}>
                             Unesi podatke i generiraj Merkle stablo
+                        </p>
+                        <p style={{ fontSize: '0.9rem', marginTop: '0.5rem', opacity: 0.7 }}>
+                            {view3D ? '🌐 3D prikaz aktivan' : '📊 2D prikaz aktivan'}
                         </p>
                     </div>
                 )}
