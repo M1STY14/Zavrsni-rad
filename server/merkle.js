@@ -42,33 +42,32 @@ function createMerkleTree(leaves) {
 }
 
 // Generiranje Merkle proof-a
-function generateMerkleProof(tree, leafValue) {
+function generateMerkleProof(treeObj, leafValue) {
     const targetHash = sha256(leafValue);// hashiranje vrijednosti lista
     let proof = [];// inicijalizacija dokaza
-    // Prvo pronalazimo indeks lista u posljednjem nivou stabla
-    // Ovo je nivo koji sadrži sve listove
-    // Na kraju stabla, svaki čvor je hash lista
-    // Na svakom nivou, čvorovi su hash kombinacija lijevog i desnog čvora
-    let index = tree.levels[tree.levels.length - 1].findIndex(node => node.hash === targetHash);
+
+    // treeObj has structure { root, tree } where tree is an array of levels
+    // tree[0] is the root level, tree[tree.length-1] is the leaf level
+    const levels = treeObj.tree;
+
+    // Prvo pronalazimo indeks lista u posljednjem nivou stabla (listovi)
+    const leafLevel = levels[levels.length - 1];
+    let index = leafLevel.findIndex(node => node.hash === targetHash);
 
     if (index === -1) {
         throw new Error('Leaf not found in tree.');
     }
 
-    // Traverse od dna prema vrhu
-    for (let i = tree.levels.length - 1; i > 0; i--) {
-        const level = tree.levels[i];// trenutni nivo
+    // Traverse od dna prema vrhu (od listova prema korijenu)
+    for (let i = levels.length - 1; i > 0; i--) {
+        const level = levels[i];// trenutni nivo
 
         const isRightNode = index % 2;// da li je trenutni čvor desni čvor
         // Ako je desni čvor, uzmi lijevi čvor kao par
         // Ako je lijevi čvor, uzmi desni čvor kao par
         const pairIndex = isRightNode ? index - 1 : index + 1;
-        // Ako postoji par, dodaj ga u dokaz
-        // Ako je par neparan, uzmi lijevi čvor kao par
-        // Ako je par paran, uzmi desni čvor kao par
 
-        // Ako je par veći od trenutnog nivoa, uzmi lijevi čvor kao par
-        // Ako je par manji od trenutnog nivoa, uzmi desni čvor kao par
+        // Ako postoji par, dodaj ga u dokaz
         if (pairIndex < level.length) {
             proof.push({
                 position: isRightNode ? 'left' : 'right',

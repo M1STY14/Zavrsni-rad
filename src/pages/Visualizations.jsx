@@ -71,43 +71,58 @@ const Visualizations = () => {
             </div>
 
             <div className="InputContainer">
+                <div style={{
+                    marginBottom: '1rem',
+                    padding: '1rem 1.5rem',
+                    background: 'rgba(0, 212, 255, 0.08)',
+                    border: '1px solid rgba(0, 212, 255, 0.2)',
+                    borderRadius: '12px',
+                    fontSize: '0.9rem',
+                    color: 'rgba(255,255,255,0.9)',
+                    textAlign: 'center'
+                }}>
+                    💡 <strong>Savjet:</strong> Za testiranje, pokušajte Bitcoin blok <strong>100000</strong> ili <strong>500000</strong>, ili unesite vlastite transakcije (npr: tx1, tx2, tx3, tx4)
+                </div>
+
                 <div className="BitcoinInputs">
                     <label>
-                        Broj bloka
+                        Broj Bitcoin bloka
                         <input
                             type="number"
                             min="0"
                             max="100000000"
                             value={blockNum}
                             onChange={(e) => setBlockHeight(e.target.value)}
-                            placeholder="npr. 500000"
+                            placeholder="100000 ili 500000"
                         />
                     </label>
                     <label>
-                        Hash bloka
+                        Hash Bitcoin bloka
                         <input
                             type="text"
                             value={blockHash}
                             onChange={(e) => setBlockHash(e.target.value)}
-                            placeholder="npr. 00000000000000000..."
+                            placeholder="0000000000..."
                         />
                     </label>
                     <label>
-                        Popis transakcija
+                        Popis transakcija (odvojene zarezom)
                         <input
                             type="text"
                             value={transactionList}
                             onChange={(e) => setTransactionList(e.target.value)}
-                            placeholder="tx1, tx2, tx3..."
+                            placeholder="tx1, tx2, tx3, tx4..."
                         />
                     </label>
                     <label>
-                        Transakcija
+                        Pojedinačna transakcija (za dokaz)
                         <input
                             type="text"
                             value={singleTransaction}
                             onChange={(e) => setSingleTransaction(e.target.value)}
-                            placeholder="txid"
+                            placeholder="Prvo generiraj stablo"
+                            disabled={!rootHash}
+                            title={!rootHash ? "Prvo generirajte stablo koristeći 'Popis transakcija'" : "Unesite transakciju iz generiranog stabla"}
                         />
                     </label>
                 </div>
