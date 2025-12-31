@@ -3,10 +3,10 @@ import React from 'react';
 import './App.css';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Nav from './Navigation.jsx';
-import Layout from './pages/Layout.js';
+import Layout from './pages/Layout.jsx';
 import Home from './pages/Home.jsx';
 import Visualizations from './pages/Visualizations.jsx';
-import About from './pages/About.js';
+import About from './pages/About.jsx';
 
 
 //aplikacija

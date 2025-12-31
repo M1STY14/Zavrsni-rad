@@ -1,4 +1,3 @@
-import e from "cors";
 import { Outlet, Link } from "react-router-dom";
 
 const Layout = () => {

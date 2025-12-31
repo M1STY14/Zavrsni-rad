@@ -1,70 +1,100 @@
-# Getting Started with Create React App
+# Merkle Tree Visualizer
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Interactive visualization of Merkle trees in real-world systems including Bitcoin, Git, and BitTorrent.
 
-## Available Scripts
+## Project Structure
 
-In the project directory, you can run:
+```
+merkle_visualizer/
+├── src/               # Frontend React application
+├── server/            # Backend Express server
+├── public/            # Static assets
+└── index.html         # Main HTML entry point
+```
 
-### `npm start`
+## Getting Started
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+### Prerequisites
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+- Node.js (v18 or higher)
+- npm or yarn
 
-### `npm test`
+### Installation
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+1. **Install frontend dependencies:**
+   ```bash
+   npm install
+   ```
 
-### `npm run build`
+2. **Install backend dependencies:**
+   ```bash
+   cd server
+   npm install
+   cd ..
+   ```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### Running the Application
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+You'll need to run both the frontend and backend servers:
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+1. **Start the backend server (Terminal 1):**
+   ```bash
+   npm run server
+   ```
+   Server will run on http://localhost:4000
 
-### `npm run eject`
+2. **Start the frontend dev server (Terminal 2):**
+   ```bash
+   npm run dev
+   ```
+   Frontend will run on http://localhost:3000
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+### Available Scripts
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+#### Frontend
+- `npm run dev` - Start development server with Vite
+- `npm run build` - Build for production
+- `npm run preview` - Preview production build
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+#### Backend
+- `npm run server` - Start the Express backend server
+- `cd server && npm run dev` - Start backend with nodemon (auto-reload)
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+## Technology Stack
 
-## Learn More
+### Frontend
+- **React 19** - UI library
+- **Vite** - Build tool and dev server
+- **D3.js** - Data visualization
+- **React Router** - Client-side routing
+- **Tailwind CSS** - Styling
+- **Motion** - Animations
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+### Backend
+- **Express** - Web server
+- **Bitcoin Core** - Bitcoin blockchain integration
+- **CORS** - Cross-origin resource sharing
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+## Features
 
-### Code Splitting
+- Interactive Merkle tree visualization
+- Bitcoin block analysis
+- Custom transaction list visualization
+- Merkle proof generation and verification
+- Zoom and pan capabilities
+- Click to view node details
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+## Assignment Requirements
 
-### Analyzing the Bundle Size
+This project fulfills the requirement to visualize Merkle trees in at least two real-world systems:
+- ✅ Bitcoin blocks
+- 🚧 Git commits (planned)
+- 🚧 BitTorrent files (planned)
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+## Development
 
-### Making a Progressive Web App
+Built with ⚡ Vite for fast HMR (Hot Module Replacement) and optimized builds.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+## License
 
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+© 2025 Leo Kocijan. All rights reserved.
