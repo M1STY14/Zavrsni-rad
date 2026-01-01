@@ -29,8 +29,8 @@ function TreeNode({ position, hash, depth, onClick, isHighlighted }) {
 
     useFrame((state) => {
         if (meshRef.current && !hovered) {
-            // Gentle floating animation
-            meshRef.current.position.y = position[1] + Math.sin(state.clock.elapsedTime + position[0]) * 0.1;
+            // Gentle floating animation - relative to group position
+            meshRef.current.position.y = Math.sin(state.clock.elapsedTime + position[0]) * 0.1;
         }
     });
 
@@ -43,23 +43,23 @@ function TreeNode({ position, hash, depth, onClick, isHighlighted }) {
                 onPointerOver={() => setHovered(true)}
                 onPointerOut={() => setHovered(false)}
             >
-                <sphereGeometry args={[0.5, 32, 32]} />
+                <sphereGeometry args={[0.4, 32, 32]} />
                 <meshStandardMaterial
                     color={baseColor}
                     emissive={baseColor}
-                    emissiveIntensity={hovered ? 0.8 : 0.3}
-                    metalness={0.8}
-                    roughness={0.2}
+                    emissiveIntensity={hovered ? 1.0 : 0.4}
+                    metalness={0.9}
+                    roughness={0.1}
                 />
             </animated.mesh>
 
             {/* Glow effect */}
-            <mesh scale={hovered ? 1.8 : 1.3}>
-                <sphereGeometry args={[0.5, 32, 32]} />
+            <mesh scale={hovered ? 2.0 : 1.5}>
+                <sphereGeometry args={[0.4, 32, 32]} />
                 <meshBasicMaterial
                     color={baseColor}
                     transparent
-                    opacity={hovered ? 0.3 : 0.15}
+                    opacity={hovered ? 0.4 : 0.2}
                     side={THREE.BackSide}
                 />
             </mesh>
@@ -67,12 +67,12 @@ function TreeNode({ position, hash, depth, onClick, isHighlighted }) {
             {/* Hash label */}
             {hovered && (
                 <Text
-                    position={[0, 1.2, 0]}
-                    fontSize={0.2}
+                    position={[0, 1.0, 0]}
+                    fontSize={0.25}
                     color="#ffffff"
                     anchorX="center"
                     anchorY="middle"
-                    outlineWidth={0.02}
+                    outlineWidth={0.03}
                     outlineColor="#000000"
                 >
                     {hash.substring(0, 8)}...
@@ -82,34 +82,34 @@ function TreeNode({ position, hash, depth, onClick, isHighlighted }) {
     );
 }
 
-// Connection line between nodes
+// Connection line between nodes using tube for better visibility
 function Connection({ start, end, isHighlighted }) {
     const points = useMemo(() => {
         const curve = new THREE.CatmullRomCurve3([
             new THREE.Vector3(...start),
             new THREE.Vector3(
                 (start[0] + end[0]) / 2,
-                (start[1] + end[1]) / 2 - 0.5,
+                (start[1] + end[1]) / 2 - 0.3,
                 (start[2] + end[2]) / 2
             ),
             new THREE.Vector3(...end),
         ]);
-        return curve.getPoints(50);
+        return curve.getPoints(30);
     }, [start, end]);
 
     const lineGeometry = useMemo(() => {
-        return new THREE.BufferGeometry().setFromPoints(points);
+        const curve = new THREE.CatmullRomCurve3(points.map(p => new THREE.Vector3(p.x, p.y, p.z)));
+        return new THREE.TubeGeometry(curve, 20, 0.04, 8, false);
     }, [points]);
 
     return (
-        <line geometry={lineGeometry}>
-            <lineBasicMaterial
+        <mesh geometry={lineGeometry}>
+            <meshBasicMaterial
                 color={isHighlighted ? '#00ffff' : '#00d4ff'}
                 transparent
-                opacity={isHighlighted ? 0.8 : 0.3}
-                linewidth={2}
+                opacity={isHighlighted ? 0.9 : 0.5}
             />
-        </line>
+        </mesh>
     );
 }
 
@@ -154,97 +154,98 @@ function Particles({ count = 1000 }) {
     );
 }
 
-// Calculate 3D positions for tree nodes
-function calculateTreePositions(node, depth = 0, x = 0, z = 0, spreadX = 8, spreadZ = 3) {
-    if (!node) return [];
+// Calculate 3D positions for tree nodes - returns map of hash to position and node data
+function calculateTreePositions(node, depth = 0, parentX = 0, indexInLevel = 0, totalAtLevel = 1, positions = new Map(), levelCounts = {}) {
+    if (!node) return positions;
 
-    const y = -depth * 3; // Vertical spacing between levels
-    const positions = [];
+    // Track how many nodes at this level
+    if (!levelCounts[depth]) levelCounts[depth] = 0;
+    const myIndexAtLevel = levelCounts[depth];
+    levelCounts[depth]++;
 
-    // Current node position
-    positions.push({
+    // Calculate Y position (depth - going downward)
+    const y = -depth * 3;
+
+    // Calculate total width needed for this level
+    // For depth 0 (root): center at 0
+    // For depth 1: spread children around parent
+    // For depth 2+: spread based on position
+    let xPos;
+
+    if (depth === 0) {
+        xPos = 0; // Root at center
+    } else if (depth === 1) {
+        // First level: spread around center
+        const spacing = 4;
+        xPos = (indexInLevel - (totalAtLevel - 1) / 2) * spacing;
+    } else {
+        // Deeper levels: position based on parent with offset
+        const spacing = 6 / Math.pow(1.5, depth - 1);
+        xPos = parentX + (indexInLevel - (totalAtLevel - 1) / 2) * spacing;
+    }
+
+    // Calculate Z position - subtle wave based on X position
+    const zPos = Math.sin(xPos * 0.3) * 1.2;
+
+    // Store position with hash as key
+    positions.set(node.name, {
         hash: node.name,
-        position: [x, y, z],
+        position: [xPos, y, zPos],
         depth: depth,
-        node: node
+        node: node,
+        children: node.children || []
     });
 
     // Calculate positions for children
     if (node.children && node.children.length > 0) {
-        const childSpreadX = spreadX / 2;
-        const childSpreadZ = spreadZ / 1.5;
-
-        node.children.forEach((child, index) => {
-            const offsetX = (index - (node.children.length - 1) / 2) * childSpreadX;
-            const offsetZ = depth % 2 === 0 ? childSpreadZ : -childSpreadZ;
-
-            const childPositions = calculateTreePositions(
+        node.children.forEach((child, childIndex) => {
+            calculateTreePositions(
                 child,
                 depth + 1,
-                x + offsetX,
-                z + offsetZ,
-                childSpreadX,
-                childSpreadZ
+                xPos, // Parent's X position
+                childIndex,
+                node.children.length,
+                positions,
+                levelCounts
             );
-            positions.push(...childPositions);
         });
     }
 
     return positions;
 }
 
-// Get all connections between nodes
-function getConnections(node, parentPos = null, depth = 0) {
-    if (!node) return [];
-
-    const connections = [];
-    const currentY = -depth * 3;
-
-    if (node.children && node.children.length > 0) {
-        node.children.forEach((child, index) => {
-            // We'll need to match positions calculated earlier
-            // This is a simplified version - we'll enhance this
-            connections.push({
-                start: parentPos || [0, currentY, 0],
-                end: [0, currentY - 3, 0], // Placeholder
-                depth: depth
-            });
-
-            connections.push(...getConnections(child, null, depth + 1));
-        });
-    }
-
-    return connections;
-}
-
 // Main 3D Scene component
 function Scene({ data, onNodeClick }) {
     const [selectedHash, setSelectedHash] = useState(null);
 
-    const nodePositions = useMemo(() => {
-        if (!data) return [];
-        return calculateTreePositions(data);
-    }, [data]);
+    const { nodePositions, connections } = useMemo(() => {
+        if (!data) return { nodePositions: [], connections: [] };
 
-    const connections = useMemo(() => {
-        if (nodePositions.length === 0) return [];
+        // Calculate positions - returns a Map
+        const posMap = calculateTreePositions(data);
 
+        // Convert Map to array for rendering
+        const positions = Array.from(posMap.values());
+
+        // Generate connections based on actual tree structure
         const conns = [];
-        nodePositions.forEach((nodeData) => {
-            if (nodeData.node.children) {
-                nodeData.node.children.forEach((child) => {
-                    const childPos = nodePositions.find(p => p.hash === child.name);
-                    if (childPos) {
+        posMap.forEach((nodeData) => {
+            // For each node, connect to its children
+            if (nodeData.children && nodeData.children.length > 0) {
+                nodeData.children.forEach((child) => {
+                    const childData = posMap.get(child.name);
+                    if (childData) {
                         conns.push({
                             start: nodeData.position,
-                            end: childPos.position,
+                            end: childData.position,
                         });
                     }
                 });
             }
         });
-        return conns;
-    }, [nodePositions]);
+
+        return { nodePositions: positions, connections: conns };
+    }, [data]);
 
     const handleNodeClick = (hash) => {
         setSelectedHash(hash);
@@ -254,15 +255,15 @@ function Scene({ data, onNodeClick }) {
     return (
         <>
             {/* Lighting */}
-            <ambientLight intensity={0.3} />
-            <pointLight position={[10, 10, 10]} intensity={0.8} color="#00d4ff" />
-            <pointLight position={[-10, -10, -10]} intensity={0.5} color="#667eea" />
-            <spotLight
-                position={[0, 20, 0]}
-                angle={0.3}
-                penumbra={1}
-                intensity={0.5}
-                color="#ffffff"
+            <ambientLight intensity={0.4} />
+            <directionalLight position={[10, 10, 5]} intensity={0.6} color="#ffffff" />
+            <pointLight position={[0, 5, 10]} intensity={1.2} color="#00d4ff" />
+            <pointLight position={[-8, -5, -5]} intensity={0.8} color="#667eea" />
+            <pointLight position={[8, -5, -5]} intensity={0.8} color="#764ba2" />
+            <hemisphereLight
+                skyColor="#00d4ff"
+                groundColor="#0a0a1a"
+                intensity={0.3}
             />
 
             {/* Background effects */}
@@ -297,10 +298,13 @@ function Scene({ data, onNodeClick }) {
                 dampingFactor={0.05}
                 rotateSpeed={0.5}
                 zoomSpeed={0.8}
-                minDistance={5}
-                maxDistance={50}
+                minDistance={10}
+                maxDistance={35}
+                maxPolarAngle={Math.PI / 1.5}
+                minPolarAngle={Math.PI / 6}
+                target={[0, -4, 0]}
                 autoRotate
-                autoRotateSpeed={0.5}
+                autoRotateSpeed={0.4}
             />
         </>
     );
@@ -333,7 +337,7 @@ export default function VisualizacijaStabla3D({ data }) {
     return (
         <div style={{ width: '100%', height: '100%', position: 'relative' }}>
             <Canvas
-                camera={{ position: [0, 0, 20], fov: 60 }}
+                camera={{ position: [0, 1, 18], fov: 50 }}
                 style={{ background: 'linear-gradient(to bottom, #000000, #0a0a1a)' }}
             >
                 <Scene data={data} onNodeClick={handleNodeClick} />
