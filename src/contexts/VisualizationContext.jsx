@@ -4,7 +4,7 @@ const VisualizationContext = createContext();
 
 export const VisualizationProvider = ({ children }) => {
   const [cameraState, setCameraState] = useState({
-    position: [0, 2, 18],
+    position: [0, 0, 22],
     target: [0, -2, 0],
     isTransitioning: false
   });
@@ -18,7 +18,7 @@ export const VisualizationProvider = ({ children }) => {
     setCameraState(prev => ({ ...prev, isTransitioning: true }));
 
     // Animation will use @react-spring/three to smoothly transition camera
-    // from background position [0, 2, 18] to interactive position [0, 1, 18]
+    // from background position [0, 0, 22] to interactive position [0, 1, 18]
   };
 
   const resetTransition = () => {

@@ -1,32 +1,106 @@
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useState, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Stars } from '@react-three/drei';
+import { useSpring, animated } from '@react-spring/three';
 import * as THREE from 'three';
 
-// Demo tree data - simple 4-leaf Merkle tree
+// Demo tree data - 5 levels with 16 leaves
 const DEMO_TREE = {
-  name: "a7f3c892d4e1b5f6",
+  name: "root_a7f3c892",
   children: [
     {
-      name: "5b8e1a2fc3d4e5f6",
+      name: "lvl1_5b8e1a2f",
       children: [
-        { name: "e3c1a9f0" },
-        { name: "7b125f3c" }
+        {
+          name: "lvl2_e3c1a9f0",
+          children: [
+            {
+              name: "lvl3_1a2b3c4d",
+              children: [
+                { name: "leaf_01abc123" },
+                { name: "leaf_02def456" }
+              ]
+            },
+            {
+              name: "lvl3_2e3f4a5b",
+              children: [
+                { name: "leaf_03ghi789" },
+                { name: "leaf_04jkl012" }
+              ]
+            }
+          ]
+        },
+        {
+          name: "lvl2_7b125f3c",
+          children: [
+            {
+              name: "lvl3_3c4d5e6f",
+              children: [
+                { name: "leaf_05mno345" },
+                { name: "leaf_06pqr678" }
+              ]
+            },
+            {
+              name: "lvl3_4f5a6b7c",
+              children: [
+                { name: "leaf_07stu901" },
+                { name: "leaf_08vwx234" }
+              ]
+            }
+          ]
+        }
       ]
     },
     {
-      name: "9c2d4f1ab5e6c7d8",
+      name: "lvl1_9c2d4f1a",
       children: [
-        { name: "a4d1bb99" },
-        { name: "0c5423d1" }
+        {
+          name: "lvl2_a4d1bb99",
+          children: [
+            {
+              name: "lvl3_5d6e7f8a",
+              children: [
+                { name: "leaf_09yza567" },
+                { name: "leaf_10bcd890" }
+              ]
+            },
+            {
+              name: "lvl3_6e7f8a9b",
+              children: [
+                { name: "leaf_11efg123" },
+                { name: "leaf_12hij456" }
+              ]
+            }
+          ]
+        },
+        {
+          name: "lvl2_0c5423d1",
+          children: [
+            {
+              name: "lvl3_7f8a9b0c",
+              children: [
+                { name: "leaf_13klm789" },
+                { name: "leaf_14nop012" }
+              ]
+            },
+            {
+              name: "lvl3_8a9b0c1d",
+              children: [
+                { name: "leaf_15qrs345" },
+                { name: "leaf_16tuv678" }
+              ]
+            }
+          ]
+        }
       ]
     }
   ]
 };
 
-// Simplified TreeNode component for background (no interaction)
-function TreeNode({ position, depth }) {
+// Simplified TreeNode component with build-up animation
+function TreeNode({ position, depth, maxDepth }) {
   const meshRef = useRef();
+  const glowRef = useRef();
 
   // Color based on depth in tree
   const baseColor = useMemo(() => {
@@ -34,10 +108,22 @@ function TreeNode({ position, depth }) {
       '#00d4ff', // Root - cyan
       '#00b8e6', // Level 1
       '#667eea', // Level 2
-      '#764ba2', // Level 3 - purple
+      '#764ba2', // Level 3
+      '#9b59b6', // Level 4 - purple
     ];
     return colors[Math.min(depth, colors.length - 1)];
   }, [depth]);
+
+  // Animation timing: leaves appear first, then wait for connections, then next level
+  // Each level: 800ms node appear + 1200ms connection draw = 2000ms per level
+  const levelDelay = (maxDepth - depth) * 2000; // Leaves = 0ms, root = maxDepth * 2000ms
+
+  const { scale } = useSpring({
+    from: { scale: 0 },
+    to: { scale: 1 },
+    delay: levelDelay,
+    config: { mass: 1, tension: 180, friction: 20 }
+  });
 
   // Gentle floating animation
   useFrame((state) => {
@@ -47,7 +133,7 @@ function TreeNode({ position, depth }) {
   });
 
   return (
-    <group position={position}>
+    <animated.group position={position} scale={scale}>
       <mesh ref={meshRef}>
         <sphereGeometry args={[0.4, 16, 16]} />
         <meshStandardMaterial
@@ -60,7 +146,7 @@ function TreeNode({ position, depth }) {
       </mesh>
 
       {/* Glow effect */}
-      <mesh scale={1.5}>
+      <mesh ref={glowRef} scale={1.5}>
         <sphereGeometry args={[0.4, 16, 16]} />
         <meshBasicMaterial
           color={baseColor}
@@ -69,33 +155,56 @@ function TreeNode({ position, depth }) {
           side={THREE.BackSide}
         />
       </mesh>
-    </group>
+    </animated.group>
   );
 }
 
-// Connection line between nodes
-function Connection({ start, end }) {
-  const points = useMemo(() => {
-    const curve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(...start),
+// Connection line between nodes with progressive drawing animation (loading bar style)
+function Connection({ start, end, childDepth, maxDepth }) {
+  const meshRef = useRef();
+  const materialRef = useRef();
+
+  const { fullGeometry, curvePoints } = useMemo(() => {
+    // REVERSED: Start from child (end), draw toward parent (start)
+    const c = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(...end),  // Child node (bottom)
       new THREE.Vector3(
         (start[0] + end[0]) / 2,
         (start[1] + end[1]) / 2 - 0.3,
         (start[2] + end[2]) / 2
       ),
-      new THREE.Vector3(...end),
+      new THREE.Vector3(...start),  // Parent node (top)
     ]);
-    return curve.getPoints(30);
+    const points = c.getPoints(50);
+    const geom = new THREE.TubeGeometry(c, 50, 0.04, 8, false);
+    geom.setDrawRange(0, 0); // Start with nothing drawn
+    return { fullGeometry: geom, curvePoints: points };
   }, [start, end]);
 
-  const lineGeometry = useMemo(() => {
-    const curve = new THREE.CatmullRomCurve3(points.map(p => new THREE.Vector3(p.x, p.y, p.z)));
-    return new THREE.TubeGeometry(curve, 20, 0.04, 8, false);
-  }, [points]);
+  // Connection grows after child nodes appear (800ms) + small delay
+  const connectionStartDelay = (maxDepth - childDepth) * 2000 + 800;
+
+  const { progress } = useSpring({
+    from: { progress: 0 },
+    to: { progress: 1 },
+    delay: connectionStartDelay,
+    config: { mass: 1, tension: 100, friction: 30 }
+  });
+
+  // Update draw range based on progress
+  useFrame(() => {
+    if (meshRef.current && meshRef.current.geometry) {
+      const currentProgress = progress.get();
+      const totalCount = meshRef.current.geometry.index.count;
+      const drawCount = Math.floor(currentProgress * totalCount);
+      meshRef.current.geometry.setDrawRange(0, drawCount);
+    }
+  });
 
   return (
-    <mesh geometry={lineGeometry}>
+    <mesh ref={meshRef} geometry={fullGeometry}>
       <meshBasicMaterial
+        ref={materialRef}
         color="#00d4ff"
         transparent
         opacity={0.5}
@@ -153,16 +262,17 @@ function calculateTreePositions(node, depth = 0, parentX = 0, indexInLevel = 0, 
   const myIndexAtLevel = levelCounts[depth];
   levelCounts[depth]++;
 
-  const y = -depth * 3;
+  const y = -depth * 3 + 4; // Moved up by 4 units
 
   let xPos;
   if (depth === 0) {
     xPos = 0;
   } else if (depth === 1) {
-    const spacing = 4;
+    const spacing = 6;
     xPos = (indexInLevel - (totalAtLevel - 1) / 2) * spacing;
   } else {
-    const spacing = 6 / Math.pow(1.5, depth - 1);
+    // Increased spacing formula - doesn't shrink as much for deeper levels
+    const spacing = 8 / Math.pow(1.3, depth - 1);
     xPos = parentX + (indexInLevel - (totalAtLevel - 1) / 2) * spacing;
   }
 
@@ -199,26 +309,39 @@ function Scene({ isMobile }) {
   const particleCount = isMobile ? 100 : 200;
   const starCount = isMobile ? 1000 : 2000;
 
-  const { nodePositions, connections } = useMemo(() => {
+  const { nodePositions, connections, maxDepth } = useMemo(() => {
     const posMap = calculateTreePositions(DEMO_TREE);
     const positions = Array.from(posMap.values());
 
+    // Find max depth for animation timing
+    const maxD = Math.max(...positions.map(p => p.depth));
+
     const conns = [];
+    const connSet = new Set(); // Track unique connections to prevent duplicates
+
     posMap.forEach((nodeData) => {
       if (nodeData.children && nodeData.children.length > 0) {
         nodeData.children.forEach((child) => {
           const childData = posMap.get(child.name);
           if (childData) {
-            conns.push({
-              start: nodeData.position,
-              end: childData.position,
-            });
+            // Create unique key for this connection
+            const connKey = `${nodeData.hash}-${childData.hash}`;
+            if (!connSet.has(connKey)) {
+              connSet.add(connKey);
+              conns.push({
+                start: nodeData.position,
+                end: childData.position,
+                childDepth: childData.depth,
+                key: connKey, // Add unique key for React rendering
+              });
+            }
           }
         });
       }
     });
 
-    return { nodePositions: positions, connections: conns };
+    console.log('Total connections created:', conns.length);
+    return { nodePositions: positions, connections: conns, maxDepth: maxD };
   }, []);
 
   // Gentle auto-rotation
@@ -242,20 +365,23 @@ function Scene({ isMobile }) {
       {/* Tree group with rotation */}
       <group ref={groupRef}>
         {/* Tree connections */}
-        {connections.map((conn, i) => (
+        {connections.map((conn) => (
           <Connection
-            key={i}
+            key={conn.key}
             start={conn.start}
             end={conn.end}
+            childDepth={conn.childDepth}
+            maxDepth={maxDepth}
           />
         ))}
 
         {/* Tree nodes */}
-        {nodePositions.map((nodeData, i) => (
+        {nodePositions.map((nodeData) => (
           <TreeNode
-            key={i}
+            key={nodeData.hash}
             position={nodeData.position}
             depth={nodeData.depth}
+            maxDepth={maxDepth}
           />
         ))}
       </group>
@@ -268,7 +394,7 @@ export default function BackgroundVisualization3D({ isMobile = false }) {
   return (
     <div style={{ width: '100%', height: '100%' }}>
       <Canvas
-        camera={{ position: [0, 2, 18], fov: 60 }}
+        camera={{ position: [0, 0, 22], fov: 60 }}
         style={{ background: 'linear-gradient(to bottom, #000000, #0a0a1a)' }}
       >
         <Scene isMobile={isMobile} />
