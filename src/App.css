@@ -46,7 +46,7 @@ body {
   flex-direction: row;
   align-items: center;
   justify-content: center;
-  padding: 1.2rem 1rem;
+  padding: 1.2rem 1rem 1rem 1rem;
   background: rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -75,6 +75,7 @@ body {
   gap: 3rem;
   margin: 0;
   padding: 0;
+  flex-wrap: nowrap;
 }
 
 .text_section {
@@ -111,10 +112,13 @@ li a {
   text-decoration: none;
   color: #e6e6e6;
   font-weight: 500;
+  font-size: 2rem;
   padding: 0.5rem 1rem;
   border-radius: 10px;
   transition: all 0.3s ease;
   position: relative;
+  display: inline-block;
+  white-space: nowrap;
 }
 
 li a:hover {
@@ -125,7 +129,7 @@ li a:hover {
 li a::after {
   content: '';
   position: absolute;
-  bottom: 0;
+  bottom: 0.25rem;
   left: 50%;
   width: 0;
   height: 2px;
@@ -185,6 +189,10 @@ h1 {
   margin-bottom: 1.5rem;
   animation: gradientShift 6s ease infinite;
   background-size: 200% 200%;
+  text-shadow:
+    0 2px 20px rgba(0, 0, 0, 0.9),
+    0 0 40px rgba(0, 212, 255, 0.4);
+  filter: drop-shadow(0 2px 20px rgba(0, 0, 0, 0.9)) drop-shadow(0 0 40px rgba(0, 212, 255, 0.4));
 }
 
 @keyframes gradientShift {
@@ -223,7 +231,8 @@ h1 {
   }
 }
 
-.Visualization_showcase {
+/* Removed - replaced by 3D background */
+/* .Visualization_showcase {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -250,7 +259,7 @@ h1 {
 .Visualization_showcase>img:hover {
   transform: scale(1.02);
   box-shadow: 0 15px 60px rgba(0, 212, 255, 0.3);
-}
+} */
 
 .BitcoinInputs {
   width: 100%;
@@ -335,7 +344,9 @@ button {
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
+  box-shadow:
+    0 4px 20px rgba(0, 212, 255, 0.3),
+    0 0 40px rgba(0, 212, 255, 0.2);
   position: relative;
   overflow: hidden;
 }

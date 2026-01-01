@@ -1,10 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import '../App.css';
-import showcase from '../myfinesspallogo.png';
+import BackgroundVisualization3D from '../components/BackgroundVisualization3D';
 
 const Home = () => {
   const naslov = React.useRef(null);
+  const [isMobile, setIsMobile] = React.useState(window.innerWidth < 768);
 
   React.useEffect(() => {
     // Add floating animation on mount
@@ -12,11 +13,32 @@ const Home = () => {
     if (title) {
       title.style.animation = 'fadeInUp 1s ease-out';
     }
+
+    // Handle window resize for mobile detection
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   return (
-    <>
-      <div className="text_section">
+    <div style={{ position: 'relative', minHeight: '100vh' }}>
+      {/* Fixed 3D background layer */}
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        zIndex: 0
+      }}>
+        <BackgroundVisualization3D isMobile={isMobile} />
+      </div>
+
+      {/* Content layer */}
+      <div className="text_section" style={{ position: 'relative', zIndex: 1 }}>
         <h1 className="naslov_zavrsnog_rada" ref={naslov}>
           Vizualizacija Merkle stabla
           <br />
@@ -63,15 +85,11 @@ const Home = () => {
         </Link>
       </div>
 
-      <div className="Visualization_showcase">
-        <img src={showcase} alt="Merkle Tree Visualization" />
-      </div>
-
-      <div className="main_footer">
+      <div className="main_footer" style={{ position: 'relative', zIndex: 1 }}>
         <p>Leo Kocijan &copy; 2025</p>
         <p>All rights reserved.</p>
       </div>
-    </>
+    </div>
   );
 }
 
