@@ -1,26 +1,18 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 
 const Nav = () => {
-    const nav_bar = React.useRef(null);
-
-    React.useEffect(() => {
-        nav_bar.current.addEventListener('click', () => {
-            console.log("Clicked on nav item");
-        });
-    }, []);
+    const location = useLocation();
 
     return (
-        <>
-            <nav className="nav">
-                <ul className="nav-list" ref={nav_bar}>
-                    <li><Link to="/">Home</Link></li>
-                    <li><Link to="/visualizations">Vizualizacije</Link></li>
-                    <li><Link to="/about">About</Link></li>
-                </ul>
-            </nav>
-        </>
+        <nav className="nav">
+            <ul className="nav-list">
+                <li><Link to="/" className={location.pathname === '/' ? 'nav-active' : ''}>Home</Link></li>
+                <li><Link to="/visualizations" className={location.pathname === '/visualizations' ? 'nav-active' : ''}>Visualizations</Link></li>
+                <li><Link to="/about" className={location.pathname === '/about' ? 'nav-active' : ''}>About</Link></li>
+            </ul>
+        </nav>
     );
-}
+};
 
 export default Nav;

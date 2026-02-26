@@ -103,12 +103,14 @@ function verifyMerkleProof(leafValue, proof, rootHash) {
 
 function transformTree(node) {
     if (!node) return null;
-    return {
-        name: node.hash,
-        children: node.left && node.right
-            ? [transformTree(node.left), transformTree(node.right)]
-            : []
-    };
+    const result = { name: node.hash };
+    if (node.value !== undefined) result.value = node.value;
+    if (node.left || node.right) {
+        result.children = [];
+        if (node.left) result.children.push(transformTree(node.left));
+        if (node.right) result.children.push(transformTree(node.right));
+    }
+    return result;
 }
 
 // Export funkcija
