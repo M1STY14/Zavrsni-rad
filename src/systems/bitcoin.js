@@ -46,4 +46,24 @@ const bitcoin = {
     },
 };
 
+export async function fetchAdjacentBlocks(height) {
+    const neighbors = [];
+    const targets = [
+        { h: height - 1, side: 'left' },
+        { h: height + 1, side: 'right' },
+    ];
+    await Promise.all(targets.map(async ({ h, side }) => {
+        try {
+            const res = await fetch(`/api/bitcoin/block-by-height/${h}`);
+            if (res.ok) {
+                const data = await res.json();
+                neighbors.push({ height: h, tree: data.tree, rootHash: data.rootHash, side });
+            }
+        } catch {
+            // silently ignore — neighbor block is optional
+        }
+    }));
+    return neighbors;
+}
+
 export default bitcoin;

@@ -427,8 +427,227 @@ function calculateTreePositions(node, depth = 0, parentX = 0, indexInLevel = 0, 
   return positions;
 }
 
+// Single floating node inside a neighbor tree — scales in, then floats
+function NeighborNode({ position, color, offset, delay = 0 }) {
+  const meshRef = useRef();
+  const matRef = useRef();
+  const appeared = useRef(false);
+
+  const { scale } = useSpring({
+    from: { scale: 0 },
+    to: { scale: 1 },
+    delay,
+    config: { mass: 1, tension: 180, friction: 20 },
+    onRest: () => { appeared.current = true; },
+  });
+
+  useFrame((state) => {
+    if (!appeared.current) return;
+    const t = state.clock.elapsedTime;
+    if (meshRef.current) {
+      meshRef.current.position.y = position[1] + Math.sin(t * 0.8 + offset) * 0.15;
+      meshRef.current.position.x = position[0] + Math.cos(t * 0.5 + offset * 1.3) * 0.05;
+    }
+    if (matRef.current) {
+      matRef.current.emissiveIntensity = 0.2 + Math.sin(t * 1.2 + offset) * 0.15;
+      matRef.current.opacity = 0.25 + Math.sin(t * 0.9 + offset * 0.7) * 0.08;
+    }
+  });
+
+  return (
+    <animated.mesh ref={meshRef} position={position} scale={scale}>
+      <sphereGeometry args={[0.4, 16, 16]} />
+      <meshStandardMaterial
+        ref={matRef}
+        color={color}
+        emissive={color}
+        emissiveIntensity={0.25}
+        metalness={0.9}
+        roughness={0.1}
+        transparent
+        opacity={0.3}
+      />
+    </animated.mesh>
+  );
+}
+
+// Connection inside a neighbor tree — draws progressively after a delay
+function NeighborConnection({ start, end, delay = 0 }) {
+  const meshRef = useRef();
+
+  const geometry = useMemo(() => {
+    const curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(...start),
+      new THREE.Vector3(
+        (start[0] + end[0]) / 2,
+        (start[1] + end[1]) / 2 - 0.3,
+        (start[2] + end[2]) / 2
+      ),
+      new THREE.Vector3(...end),
+    ]);
+    const geom = new THREE.TubeGeometry(curve, 20, 0.04, 8, false);
+    geom.setDrawRange(0, 0);
+    return geom;
+  }, [start, end]);
+
+  const { progress } = useSpring({
+    from: { progress: 0 },
+    to: { progress: 1 },
+    delay,
+    config: { mass: 1, tension: 100, friction: 30 },
+  });
+
+  useFrame(() => {
+    if (meshRef.current && meshRef.current.geometry) {
+      const currentProgress = progress.get();
+      const totalCount = meshRef.current.geometry.index.count;
+      meshRef.current.geometry.setDrawRange(0, Math.floor(currentProgress * totalCount));
+    }
+  });
+
+  return (
+    <mesh ref={meshRef} geometry={geometry}>
+      <meshBasicMaterial color="#5a8fa0" transparent opacity={0.25} />
+    </mesh>
+  );
+}
+
+// Neighbor tree - simplified non-interactive tree rendered as a faded backdrop
+function NeighborTree({ treeData, position = [-22, 0, 3], scale = 0.45, startDelay = 0 }) {
+  const groupRef = useRef();
+
+  const { nodePositions, connections, maxDepth: neighborMaxDepth } = useMemo(() => {
+    const posMap = calculateTreePositions(treeData, 0, 0, 0, 1, new Map(), {}, 0);
+    const positions = Array.from(posMap.values());
+
+    const conns = [];
+    const connSet = new Set();
+    posMap.forEach((nodeData) => {
+      if (nodeData.children && nodeData.children.length > 0) {
+        nodeData.children.forEach((child) => {
+          const childData = posMap.get(child.name);
+          if (childData) {
+            const connKey = `nb-${nodeData.hash}-${childData.hash}`;
+            if (!connSet.has(connKey)) {
+              connSet.add(connKey);
+              conns.push({
+                start: nodeData.position,
+                end: childData.position,
+                key: connKey,
+                parentDepth: nodeData.depth,
+              });
+            }
+          }
+        });
+      }
+    });
+
+    const maxD = Math.max(...positions.map(p => p.depth));
+    return { nodePositions: positions, connections: conns, maxDepth: maxD };
+  }, [treeData]);
+
+  const desaturatedColors = ['#5a8fa0', '#5a8fb0', '#7a7ea0', '#7a5a80', '#7a5a90'];
+
+  return (
+    <group ref={groupRef} position={position} scale={scale}>
+      {connections.map((conn) => {
+        // Connection draws after its parent node has appeared, with a small extra offset
+        const connDelay = startDelay + conn.parentDepth * 800 + 400;
+        return (
+          <NeighborConnection
+            key={conn.key}
+            start={conn.start}
+            end={conn.end}
+            delay={connDelay}
+          />
+        );
+      })}
+      {nodePositions.map((nodeData) => {
+        const color = desaturatedColors[Math.min(nodeData.depth, desaturatedColors.length - 1)];
+        // Root-to-leaf cascade: root appears first, deeper nodes later
+        const nodeDelay = startDelay + nodeData.depth * 800;
+        return (
+          <NeighborNode
+            key={`nb-${nodeData.hash}`}
+            position={nodeData.position}
+            color={color}
+            offset={nodeData.position[0] * 2 + nodeData.depth}
+            delay={nodeDelay}
+          />
+        );
+      })}
+    </group>
+  );
+}
+
+// Glowing arc connecting neighbor tree root to main tree root
+function ChainLink({ startPos, endPos, delay = 0 }) {
+  const meshRef = useRef();
+  const drawn = useRef(false);
+
+  const geometry = useMemo(() => {
+    const midX = (startPos[0] + endPos[0]) / 2;
+    const midY = (startPos[1] + endPos[1]) / 2 + 3;
+    const midZ = (startPos[2] + endPos[2]) / 2 - 2;
+    const curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(...startPos),
+      new THREE.Vector3(midX, midY, midZ),
+      new THREE.Vector3(...endPos),
+    ]);
+    const geom = new THREE.TubeGeometry(curve, 40, 0.06, 8, false);
+    geom.setDrawRange(0, 0);
+    return geom;
+  }, [startPos, endPos]);
+
+  const { progress } = useSpring({
+    from: { progress: 0 },
+    to: { progress: 1 },
+    delay,
+    config: { mass: 1, tension: 80, friction: 30 },
+    onRest: () => { drawn.current = true; },
+  });
+
+  useFrame((state) => {
+    if (!meshRef.current) return;
+    // Progressive draw
+    const currentProgress = progress.get();
+    const totalCount = meshRef.current.geometry.index.count;
+    meshRef.current.geometry.setDrawRange(0, Math.floor(currentProgress * totalCount));
+    // Pulsing glow after fully drawn
+    if (drawn.current) {
+      const pulse = 0.25 + Math.sin(state.clock.elapsedTime * 2) * 0.1;
+      meshRef.current.material.opacity = pulse;
+    }
+  });
+
+  return (
+    <mesh ref={meshRef} geometry={geometry}>
+      <meshBasicMaterial color="#f7931a" transparent opacity={0.35} />
+    </mesh>
+  );
+}
+
+// Floating block height label above a tree
+function BlockLabel({ position, height }) {
+  return (
+    <Text
+      position={position}
+      fontSize={0.8}
+      color="#ffffff"
+      anchorX="center"
+      anchorY="middle"
+      outlineWidth={0.04}
+      outlineColor="#000000"
+      transparent
+      opacity={0.6}
+    >
+      {`Block #${height}`}
+    </Text>
+  );
+}
+
 // Main scene component
-function Scene({ phase, treeData, proofHighlight, onNodeClick, isMobile, onTransitionComplete }) {
+function Scene({ phase, treeData, proofHighlight, onNodeClick, isMobile, onTransitionComplete, neighborBlocks, blockHeight }) {
   const groupRef = useRef();
   const controlsRef = useRef();
   const particleCount = isMobile ? 100 : 300;
@@ -567,7 +786,47 @@ function Scene({ phase, treeData, proofHighlight, onNodeClick, isMobile, onTrans
             />
           )
         ))}
+
+        {/* Demo neighbor trees — visible on landing and exploring until real data is loaded */}
+        {(phase === 'landing' || (phase === 'exploring' && !treeData)) && (() => {
+          // Chain link draws after the main root appears, then neighbor tree cascades root→leaf
+          const chainDelay = maxDepth * 2000 + 1000;
+          const treeDelay = chainDelay + 1200;
+          return (
+            <>
+              <ChainLink startPos={[-22, yOffset, 3]} endPos={[0, yOffset, 0]} delay={chainDelay} />
+              <NeighborTree treeData={DEMO_TREE} position={[-22, yOffset, 3]} scale={0.4} startDelay={treeDelay} />
+              <ChainLink startPos={[22, yOffset, 3]} endPos={[0, yOffset, 0]} delay={chainDelay} />
+              <NeighborTree treeData={DEMO_TREE} position={[22, yOffset, 3]} scale={0.4} startDelay={treeDelay} />
+            </>
+          );
+        })()}
       </group>
+
+      {/* Neighbor trees and chain links (outside rotating group — static backdrop) */}
+      {phase === 'exploring' && treeData && neighborBlocks && neighborBlocks.length > 0 && neighborBlocks.map((neighbor) => {
+        const pos = neighbor.side === 'left' ? [-22, 0, 3] : [22, 0, 3];
+        return (
+          <React.Fragment key={`neighbor-${neighbor.height}`}>
+            <NeighborTree
+              treeData={neighbor.tree}
+              position={pos}
+              scale={0.45}
+            />
+            <ChainLink
+              startPos={pos}
+              endPos={[0, 0, 0]}
+            />
+            <BlockLabel
+              position={[pos[0], pos[1] + 3, pos[2]]}
+              height={neighbor.height}
+            />
+          </React.Fragment>
+        );
+      })}
+      {phase === 'exploring' && treeData && blockHeight && neighborBlocks && neighborBlocks.length > 0 && (
+        <BlockLabel position={[0, 3, 0]} height={blockHeight} />
+      )}
     </>
   );
 }
@@ -579,7 +838,9 @@ export default function MerkleScene3D({
   proofHighlight = null,
   onNodeClick,
   isMobile = false,
-  onTransitionComplete
+  onTransitionComplete,
+  neighborBlocks = [],
+  blockHeight = null,
 }) {
   const [notification, setNotification] = useState(null);
 
@@ -603,6 +864,8 @@ export default function MerkleScene3D({
           onNodeClick={handleNodeClick}
           isMobile={isMobile}
           onTransitionComplete={onTransitionComplete}
+          neighborBlocks={neighborBlocks}
+          blockHeight={blockHeight}
         />
       </Canvas>
 

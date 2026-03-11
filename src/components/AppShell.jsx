@@ -4,6 +4,7 @@ import FloatingInputPanel from './FloatingInputPanel.jsx';
 import ProofVisualization from './ProofVisualization.jsx';
 import InfoModal from './InfoModal.jsx';
 import { systems } from '../systems/index.js';
+import { fetchAdjacentBlocks } from '../systems/bitcoin.js';
 import { findProofPath, isLeafNode } from '../utils/merkle.js';
 
 export default function AppShell() {
@@ -22,6 +23,7 @@ export default function AppShell() {
   const [error, setError] = useState(null);
   const [proofHighlight, setProofHighlight] = useState(null);
   const [proofData, setProofData] = useState(null);
+  const [neighborBlocks, setNeighborBlocks] = useState([]);
 
   // Mobile detection
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -62,6 +64,7 @@ export default function AppShell() {
     setError(null);
     setProofHighlight(null);
     setProofData(null);
+    setNeighborBlocks([]);
   };
 
   const handleInputChange = (key, value) => {
@@ -83,6 +86,14 @@ export default function AppShell() {
       const result = await activeSystem.fetchTree(inputValues);
       setTreeData(result.tree);
       setRootHash(result.rootHash);
+
+      // Fetch adjacent blocks for Bitcoin block height queries
+      if (activeSystem.id === 'bitcoin' && inputValues.blockHeight) {
+        const height = parseInt(inputValues.blockHeight);
+        fetchAdjacentBlocks(height).then(setNeighborBlocks);
+      } else {
+        setNeighborBlocks([]);
+      }
     } catch (err) {
       console.error('Error fetching tree:', err);
       setError(err.message || 'Error connecting to server');
@@ -98,6 +109,7 @@ export default function AppShell() {
     setError(null);
     setProofHighlight(null);
     setProofData(null);
+    setNeighborBlocks([]);
   };
 
   const handleNodeClick = useCallback((hash) => {
@@ -131,6 +143,8 @@ export default function AppShell() {
           onNodeClick={handleNodeClick}
           isMobile={isMobile}
           onTransitionComplete={handleTransitionComplete}
+          neighborBlocks={neighborBlocks}
+          blockHeight={activeSystem.id === 'bitcoin' && inputValues.blockHeight ? parseInt(inputValues.blockHeight) : null}
         />
       </div>
 

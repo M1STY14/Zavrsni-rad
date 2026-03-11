@@ -5,6 +5,26 @@ const Client = require('bitcoin-core');
 
 // Demo Bitcoin block data for testing when Bitcoin Core is not available
 const demoBitcoinBlocks = {
+    499999: {
+        height: 499999,
+        hash: '0000000000000000007962066dcd6675830131f2bc633f69057a7e72283e0187',
+        tx: [
+            { txid: 'd4a1e2b3c4d5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0' },
+            { txid: 'e5b2f3c4d5e6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1' },
+            { txid: 'f6c3a4d5e6f7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2' },
+            { txid: 'a7d4b5e6f7a8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3' },
+            { txid: 'b8e5c6f7a8b9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4' },
+        ],
+    },
+    500001: {
+        height: 500001,
+        hash: '00000000000000000014e64e1e48e524b93ce5e1b3209b42ea93625553db7fc3',
+        tx: [
+            { txid: '1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a' },
+            { txid: '2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b' },
+            { txid: '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c' },
+        ],
+    },
     500000: {
         height: 500000,
         hash: '00000000000000000024fb37364cbf81fd49cc2d51c09c75c35433c3a1945d04',
@@ -13,6 +33,25 @@ const demoBitcoinBlocks = {
             { txid: '24b1f918035784c5f58406e8c94b1b58e2f124d8c1cc8f4ab82e0f8e95e76f42' },
             { txid: 'f3e7c5a8d2b1f4e6c9a8b7d5e3f2a1c8b9d6e4f3a2b1c9d8e7f6a5b4c3d2e1f0' },
             { txid: 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2' },
+        ],
+    },
+    99999: {
+        height: 99999,
+        hash: '000000000002d01c1fccc21636b607dfd930d31d01c3a62104612a1719011250',
+        tx: [
+            { txid: 'c9f6a7b8d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9' },
+            { txid: 'da07b8c9e6f5a4b3c2d1e0f9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0' },
+            { txid: 'eb18c9daf7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f3a2b1' },
+        ],
+    },
+    100001: {
+        height: 100001,
+        hash: '00000000000080b66c911bd5ba14a74260057311eaeb1982802f7010f1a9f090',
+        tx: [
+            { txid: 'fc28d1a2b3c4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9' },
+            { txid: 'ad39e2b3c4d5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0' },
+            { txid: 'be4af3c4d5e6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1' },
+            { txid: 'cf5ba4d5e6f7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2' },
         ],
     },
     100000: {
