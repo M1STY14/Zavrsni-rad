@@ -206,9 +206,20 @@ function calculateTreePositions(node, depth, parentX, parentY, parentAngle, bran
         const jitter = (hashSeed(node.name) - 0.5) * 0.1;
 
         node.children.forEach((child, i) => {
-            const sign = i === 0 ? -1 : 1;
-            const baseSpread = SPREAD_ANGLE + 0.2 / (1 + depth);
-            const childAngle = parentAngle + sign * (baseSpread + jitter);
+            const n = node.children.length;
+            let childAngle;
+            if (n === 1) {
+                childAngle = parentAngle;
+            } else if (n === 2) {
+                const sign = i === 0 ? -1 : 1;
+                const baseSpread = SPREAD_ANGLE + 0.2 / (1 + depth);
+                childAngle = parentAngle + sign * (baseSpread + jitter);
+            } else {
+                const baseSpread = SPREAD_ANGLE + 0.2 / (1 + depth);
+                const fanWidth = Math.min(baseSpread * 2 * (1 + Math.log2(n)), Math.PI * 0.7);
+                const t = i / (n - 1);
+                childAngle = parentAngle - fanWidth / 2 + t * fanWidth + jitter;
+            }
             calculateTreePositions(child, depth + 1, x, y, childAngle, childBranchLength, positions, yOffset);
         });
     }

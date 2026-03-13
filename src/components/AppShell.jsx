@@ -5,6 +5,7 @@ import ProofVisualization from './ProofVisualization.jsx';
 import InfoModal from './InfoModal.jsx';
 import { systems } from '../systems/index.js';
 import { fetchAdjacentBlocks } from '../systems/bitcoin.js';
+import { fetchAdjacentCommits } from '../systems/git.js';
 import { findProofPath, isLeafNode } from '../utils/merkle.js';
 
 export default function AppShell() {
@@ -87,10 +88,21 @@ export default function AppShell() {
       setTreeData(result.tree);
       setRootHash(result.rootHash);
 
-      // Fetch adjacent blocks for Bitcoin block height queries
+      // Fetch adjacent blocks/commits
       if (activeSystem.id === 'bitcoin' && inputValues.blockHeight) {
         const height = parseInt(inputValues.blockHeight);
         fetchAdjacentBlocks(height).then(setNeighborBlocks);
+      } else if (activeSystem.id === 'git') {
+        const commitSha = result.rootHash;
+        const repoPath = inputValues.repoPath || '.';
+        fetchAdjacentCommits(commitSha, repoPath).then(neighbors => {
+          setNeighborBlocks(neighbors.map(n => ({
+            height: n.label,
+            tree: n.tree,
+            rootHash: n.rootHash,
+            side: n.side,
+          })));
+        });
       } else {
         setNeighborBlocks([]);
       }
@@ -144,7 +156,13 @@ export default function AppShell() {
           isMobile={isMobile}
           onTransitionComplete={handleTransitionComplete}
           neighborBlocks={neighborBlocks}
-          blockHeight={activeSystem.id === 'bitcoin' && inputValues.blockHeight ? parseInt(inputValues.blockHeight) : null}
+          blockHeight={
+            activeSystem.id === 'bitcoin' && inputValues.blockHeight
+              ? parseInt(inputValues.blockHeight)
+              : activeSystem.id === 'git' && treeData
+                ? (inputValues.commitHash || 'HEAD').substring(0, 7)
+                : null
+          }
         />
       </div>
 

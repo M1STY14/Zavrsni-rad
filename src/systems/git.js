@@ -6,14 +6,14 @@ const git = {
     description: 'Visualize Merkle trees from Git repository objects',
 
     inputs: [
-        { key: 'repoPath', label: 'Repository Path', type: 'text', placeholder: '/path/to/repo or use current' },
+        { key: 'repoPath', label: 'Repository Path', type: 'text', placeholder: 'GitHub URL or local path' },
         { key: 'commitHash', label: 'Commit Hash', type: 'text', placeholder: 'HEAD or a commit SHA...' },
     ],
 
-    hint: 'Enter a local Git repository path and commit hash to visualize the tree object structure',
+    hint: 'Paste a GitHub URL or local path. Leave empty to visualize this project at HEAD',
 
-    validate(params) {
-        return !!(params.commitHash);
+    validate() {
+        return true;
     },
 
     async fetchTree(params) {
@@ -36,5 +36,16 @@ const git = {
         };
     },
 };
+
+export async function fetchAdjacentCommits(commitSha, repoPath = '.') {
+    try {
+        const res = await fetch(`/api/git/commit/${encodeURIComponent(commitSha)}/adjacent?repoPath=${encodeURIComponent(repoPath)}`);
+        if (!res.ok) return [];
+        const data = await res.json();
+        return data.neighbors || [];
+    } catch {
+        return [];
+    }
+}
 
 export default git;
