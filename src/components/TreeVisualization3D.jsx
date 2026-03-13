@@ -3,6 +3,42 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Text, Stars } from '@react-three/drei';
 import { animated, useSpring } from '@react-spring/three';
 import * as THREE from 'three';
+import { getTreeDepth } from '../utils/merkle';
+
+// Fractal tree layout constants
+const SPREAD_ANGLE = 0.56;
+const SHRINK_FACTOR = 0.72;
+const TARGET_HEIGHT = 18;
+
+function hashSeed(name) {
+    let h = 0;
+    for (let i = 0; i < name.length; i++) {
+        h = ((h << 5) - h + name.charCodeAt(i)) | 0;
+    }
+    return ((h >>> 0) % 10000) / 10000;
+}
+
+function connectionMidpoint(start, end) {
+    const dx = end[0] - start[0];
+    const dy = end[1] - start[1];
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+    const bowAmount = len * 0.12;
+    const perpX = -dy / len;
+    const perpY = dx / len;
+    const midXBase = (start[0] + end[0]) / 2;
+    const outward = Math.sign(midXBase) || 1;
+    const flip = Math.sign(perpX) === outward ? 1 : -1;
+    return [
+        midXBase + perpX * bowAmount * flip,
+        (start[1] + end[1]) / 2 + perpY * bowAmount * flip,
+        (start[2] + end[2]) / 2
+    ];
+}
+
+function taperRadius(childDepth, maxDepth) {
+    const t = childDepth / (maxDepth || 1);
+    return 0.07 - 0.05 * t;
+}
 
 function TreeNode({ position, hash, depth, onClick, proofHighlight }) {
     const meshRef = useRef();
@@ -86,24 +122,17 @@ function TreeNode({ position, hash, depth, onClick, proofHighlight }) {
     );
 }
 
-function Connection({ start, end, isOnProofPath }) {
-    const points = useMemo(() => {
+function Connection({ start, end, isOnProofPath, childDepth = 0, maxDepth = 1 }) {
+    const lineGeometry = useMemo(() => {
+        const mid = connectionMidpoint(start, end);
         const curve = new THREE.CatmullRomCurve3([
             new THREE.Vector3(...start),
-            new THREE.Vector3(
-                (start[0] + end[0]) / 2,
-                (start[1] + end[1]) / 2 - 0.3,
-                (start[2] + end[2]) / 2
-            ),
+            new THREE.Vector3(...mid),
             new THREE.Vector3(...end),
         ]);
-        return curve.getPoints(30);
-    }, [start, end]);
-
-    const lineGeometry = useMemo(() => {
-        const curve = new THREE.CatmullRomCurve3(points.map(p => new THREE.Vector3(p.x, p.y, p.z)));
-        return new THREE.TubeGeometry(curve, 20, isOnProofPath ? 0.06 : 0.04, 8, false);
-    }, [points, isOnProofPath]);
+        const radius = taperRadius(childDepth, maxDepth);
+        return new THREE.TubeGeometry(curve, 20, isOnProofPath ? radius + 0.02 : radius, 8, false);
+    }, [start, end, isOnProofPath, childDepth, maxDepth]);
 
     return (
         <mesh geometry={lineGeometry}>
@@ -150,38 +179,37 @@ function Particles({ count = 1000 }) {
     );
 }
 
-function calculateTreePositions(node, depth = 0, parentX = 0, indexInLevel = 0, totalAtLevel = 1, positions = new Map(), levelCounts = {}) {
+function calculateTreePositions(node, depth, parentX, parentY, parentAngle, branchLength, positions, yOffset) {
     if (!node) return positions;
 
-    if (!levelCounts[depth]) levelCounts[depth] = 0;
-    levelCounts[depth]++;
-
-    const y = -depth * 3;
-    let xPos;
-
+    let x, y;
     if (depth === 0) {
-        xPos = 0;
-    } else if (depth === 1) {
-        const spacing = 4;
-        xPos = (indexInLevel - (totalAtLevel - 1) / 2) * spacing;
+        x = 0;
+        y = yOffset;
     } else {
-        const spacing = 6 / Math.pow(1.5, depth - 1);
-        xPos = parentX + (indexInLevel - (totalAtLevel - 1) / 2) * spacing;
+        x = parentX + branchLength * Math.sin(parentAngle);
+        y = parentY - branchLength * Math.cos(parentAngle);
     }
 
-    const zPos = Math.sin(xPos * 0.3) * 1.2;
+    const z = Math.sin(x * 0.3) * 0.6;
 
     positions.set(node.name, {
         hash: node.name,
-        position: [xPos, y, zPos],
+        position: [x, y, z],
         depth,
         node,
         children: node.children || [],
     });
 
     if (node.children && node.children.length > 0) {
-        node.children.forEach((child, childIndex) => {
-            calculateTreePositions(child, depth + 1, xPos, childIndex, node.children.length, positions, levelCounts);
+        const childBranchLength = branchLength * SHRINK_FACTOR;
+        const jitter = (hashSeed(node.name) - 0.5) * 0.1;
+
+        node.children.forEach((child, i) => {
+            const sign = i === 0 ? -1 : 1;
+            const baseSpread = SPREAD_ANGLE + 0.2 / (1 + depth);
+            const childAngle = parentAngle + sign * (baseSpread + jitter);
+            calculateTreePositions(child, depth + 1, x, y, childAngle, childBranchLength, positions, yOffset);
         });
     }
 
@@ -189,11 +217,15 @@ function calculateTreePositions(node, depth = 0, parentX = 0, indexInLevel = 0, 
 }
 
 function Scene({ data, onNodeClick, proofHighlight }) {
-    const { nodePositions, connections } = useMemo(() => {
-        if (!data) return { nodePositions: [], connections: [] };
+    const { nodePositions, connections, maxDepth } = useMemo(() => {
+        if (!data) return { nodePositions: [], connections: [], maxDepth: 0 };
 
-        const posMap = calculateTreePositions(data);
+        const treeDepth = getTreeDepth(data);
+        const geoSum = treeDepth > 0 ? (1 - Math.pow(SHRINK_FACTOR, treeDepth)) / (1 - SHRINK_FACTOR) : 1;
+        const branchLen = TARGET_HEIGHT / (geoSum * Math.cos(SPREAD_ANGLE));
+        const posMap = calculateTreePositions(data, 0, 0, 0, 0, branchLen, new Map(), 0);
         const positions = Array.from(posMap.values());
+        const maxD = Math.max(...positions.map(p => p.depth));
         const conns = [];
 
         posMap.forEach((nodeData) => {
@@ -207,13 +239,14 @@ function Scene({ data, onNodeClick, proofHighlight }) {
                             start: nodeData.position,
                             end: childData.position,
                             isOnProofPath: bothOnPath || false,
+                            childDepth: childData.depth,
                         });
                     }
                 });
             }
         });
 
-        return { nodePositions: positions, connections: conns };
+        return { nodePositions: positions, connections: conns, maxDepth: maxD };
     }, [data, proofHighlight]);
 
     return (
@@ -229,7 +262,7 @@ function Scene({ data, onNodeClick, proofHighlight }) {
             <Particles count={500} />
 
             {connections.map((conn, i) => (
-                <Connection key={i} start={conn.start} end={conn.end} isOnProofPath={conn.isOnProofPath} />
+                <Connection key={i} start={conn.start} end={conn.end} isOnProofPath={conn.isOnProofPath} childDepth={conn.childDepth} maxDepth={maxDepth} />
             ))}
 
             {nodePositions.map((nodeData, i) => (

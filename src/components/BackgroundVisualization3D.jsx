@@ -3,6 +3,7 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { Stars } from '@react-three/drei';
 import { useSpring, animated } from '@react-spring/three';
 import * as THREE from 'three';
+import { getTreeDepth } from '../utils/merkle';
 
 // Demo tree data - 5 levels with 16 leaves
 const DEMO_TREE = {
@@ -97,6 +98,41 @@ const DEMO_TREE = {
   ]
 };
 
+// Fractal tree layout constants
+const SPREAD_ANGLE = 0.56;
+const SHRINK_FACTOR = 0.72;
+const TARGET_HEIGHT = 18;
+
+function hashSeed(name) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) {
+    h = ((h << 5) - h + name.charCodeAt(i)) | 0;
+  }
+  return ((h >>> 0) % 10000) / 10000;
+}
+
+function connectionMidpoint(start, end) {
+  const dx = end[0] - start[0];
+  const dy = end[1] - start[1];
+  const len = Math.sqrt(dx * dx + dy * dy) || 1;
+  const bowAmount = len * 0.12;
+  const perpX = -dy / len;
+  const perpY = dx / len;
+  const midXBase = (start[0] + end[0]) / 2;
+  const outward = Math.sign(midXBase) || 1;
+  const flip = Math.sign(perpX) === outward ? 1 : -1;
+  return [
+    midXBase + perpX * bowAmount * flip,
+    (start[1] + end[1]) / 2 + perpY * bowAmount * flip,
+    (start[2] + end[2]) / 2
+  ];
+}
+
+function taperRadius(childDepth, maxDepth) {
+  const t = childDepth / (maxDepth || 1);
+  return 0.07 - 0.05 * t;
+}
+
 // Simplified TreeNode component with build-up animation
 function TreeNode({ position, depth, maxDepth }) {
   const meshRef = useRef();
@@ -166,20 +202,18 @@ function Connection({ start, end, childDepth, maxDepth }) {
 
   const { fullGeometry, curvePoints } = useMemo(() => {
     // REVERSED: Start from child (end), draw toward parent (start)
+    const mid = connectionMidpoint(end, start);
     const c = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(...end),  // Child node (bottom)
-      new THREE.Vector3(
-        (start[0] + end[0]) / 2,
-        (start[1] + end[1]) / 2 - 0.3,
-        (start[2] + end[2]) / 2
-      ),
-      new THREE.Vector3(...start),  // Parent node (top)
+      new THREE.Vector3(...end),
+      new THREE.Vector3(...mid),
+      new THREE.Vector3(...start),
     ]);
     const points = c.getPoints(50);
-    const geom = new THREE.TubeGeometry(c, 50, 0.04, 8, false);
-    geom.setDrawRange(0, 0); // Start with nothing drawn
+    const radius = taperRadius(childDepth, maxDepth);
+    const geom = new THREE.TubeGeometry(c, 50, radius, 8, false);
+    geom.setDrawRange(0, 0);
     return { fullGeometry: geom, curvePoints: points };
-  }, [start, end]);
+  }, [start, end, childDepth, maxDepth]);
 
   // Connection grows after child nodes appear (800ms) + small delay
   const connectionStartDelay = (maxDepth - childDepth) * 2000 + 800;
@@ -254,49 +288,38 @@ function Particles({ count = 200 }) {
   );
 }
 
-// Calculate 3D positions for tree nodes
-function calculateTreePositions(node, depth = 0, parentX = 0, indexInLevel = 0, totalAtLevel = 1, positions = new Map(), levelCounts = {}) {
+// Calculate 3D positions using fractal tree layout
+function calculateTreePositions(node, depth, parentX, parentY, parentAngle, branchLength, positions, yOffset) {
   if (!node) return positions;
 
-  if (!levelCounts[depth]) levelCounts[depth] = 0;
-  const myIndexAtLevel = levelCounts[depth];
-  levelCounts[depth]++;
-
-  const y = -depth * 3 + 4; // Moved up by 4 units
-
-  let xPos;
+  let x, y;
   if (depth === 0) {
-    xPos = 0;
-  } else if (depth === 1) {
-    const spacing = 6;
-    xPos = (indexInLevel - (totalAtLevel - 1) / 2) * spacing;
+    x = 0;
+    y = yOffset;
   } else {
-    // Increased spacing formula - doesn't shrink as much for deeper levels
-    const spacing = 8 / Math.pow(1.3, depth - 1);
-    xPos = parentX + (indexInLevel - (totalAtLevel - 1) / 2) * spacing;
+    x = parentX + branchLength * Math.sin(parentAngle);
+    y = parentY - branchLength * Math.cos(parentAngle);
   }
 
-  const zPos = Math.sin(xPos * 0.3) * 1.2;
+  const z = Math.sin(x * 0.3) * 0.6;
 
   positions.set(node.name, {
     hash: node.name,
-    position: [xPos, y, zPos],
-    depth: depth,
-    node: node,
+    position: [x, y, z],
+    depth,
+    node,
     children: node.children || []
   });
 
   if (node.children && node.children.length > 0) {
-    node.children.forEach((child, childIndex) => {
-      calculateTreePositions(
-        child,
-        depth + 1,
-        xPos,
-        childIndex,
-        node.children.length,
-        positions,
-        levelCounts
-      );
+    const childBranchLength = branchLength * SHRINK_FACTOR;
+    const jitter = (hashSeed(node.name) - 0.5) * 0.1;
+
+    node.children.forEach((child, i) => {
+      const sign = i === 0 ? -1 : 1;
+      const baseSpread = SPREAD_ANGLE + 0.2 / (1 + depth);
+      const childAngle = parentAngle + sign * (baseSpread + jitter);
+      calculateTreePositions(child, depth + 1, x, y, childAngle, childBranchLength, positions, yOffset);
     });
   }
 
@@ -310,7 +333,10 @@ function Scene({ isMobile }) {
   const starCount = isMobile ? 1000 : 2000;
 
   const { nodePositions, connections, maxDepth } = useMemo(() => {
-    const posMap = calculateTreePositions(DEMO_TREE);
+    const treeDepth = getTreeDepth(DEMO_TREE);
+    const geoSum = treeDepth > 0 ? (1 - Math.pow(SHRINK_FACTOR, treeDepth)) / (1 - SHRINK_FACTOR) : 1;
+    const branchLen = TARGET_HEIGHT / (geoSum * Math.cos(SPREAD_ANGLE));
+    const posMap = calculateTreePositions(DEMO_TREE, 0, 0, 0, 0, branchLen, new Map(), 4);
     const positions = Array.from(posMap.values());
 
     // Find max depth for animation timing
