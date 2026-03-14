@@ -98,6 +98,9 @@ export const DEMO_TREE = {
   ]
 };
 
+// Reveal animation timing (ms per depth level)
+const REVEAL_MS_PER_LEVEL = 650;
+
 // Fractal tree layout constants
 const SPREAD_ANGLE = 0.56;
 const SHRINK_FACTOR = 0.72;
@@ -148,7 +151,17 @@ function taperRadius(childDepth, maxDepth) {
 
 // Camera positions for each phase
 const CAMERA_LANDING = { position: [0, 0, 28], target: [0, -2, 0], fov: 60 };
-const CAMERA_EXPLORING = { position: [0, 2, 26], target: [0, -4, 0], fov: 50 };
+const CAMERA_EXPLORING_BASE = { position: [0, 2, 26], target: [0, -4, 0], fov: 50 };
+
+// Compute exploring camera that pulls back for larger trees
+function getExploringCamera(maxDepth) {
+  const extra = Math.max(0, maxDepth - 4);
+  return {
+    position: [0, 2 + extra * 2, 26 + extra * 8],
+    target: [0, -4 - extra * 2, 0],
+    fov: 50 + Math.min(extra * 4, 20),
+  };
+}
 
 // Keyboard pan — arrow keys move camera + orbit target together
 function KeyboardPan({ controlsRef, enabled }) {
@@ -193,17 +206,18 @@ function KeyboardPan({ controlsRef, enabled }) {
 }
 
 // Camera controller that smoothly transitions between phases
-function CameraController({ phase, onTransitionComplete, controlsRef, resetTrigger }) {
+function CameraController({ phase, onTransitionComplete, controlsRef, resetTrigger, exploringCamera }) {
   const { camera } = useThree();
   const targetPos = useRef(new THREE.Vector3(...CAMERA_LANDING.position));
   const targetLookAt = useRef(new THREE.Vector3(...CAMERA_LANDING.target));
   const isTransitioning = useRef(false);
   const transitionProgress = useRef(0);
 
+  const camConfig = phase === 'exploring' ? exploringCamera : CAMERA_LANDING;
+
   useEffect(() => {
-    const target = phase === 'exploring' ? CAMERA_EXPLORING : CAMERA_LANDING;
-    targetPos.current.set(...target.position);
-    targetLookAt.current.set(...target.target);
+    targetPos.current.set(...camConfig.position);
+    targetLookAt.current.set(...camConfig.target);
     isTransitioning.current = true;
     transitionProgress.current = 0;
 
@@ -211,14 +225,13 @@ function CameraController({ phase, onTransitionComplete, controlsRef, resetTrigg
     if (controlsRef.current) {
       controlsRef.current.enabled = false;
     }
-  }, [phase, controlsRef]);
+  }, [phase, controlsRef, camConfig]);
 
   // Reset camera when resetTrigger changes
   useEffect(() => {
     if (resetTrigger === 0) return;
-    const target = phase === 'exploring' ? CAMERA_EXPLORING : CAMERA_LANDING;
-    targetPos.current.set(...target.position);
-    targetLookAt.current.set(...target.target);
+    targetPos.current.set(...camConfig.position);
+    targetLookAt.current.set(...camConfig.target);
     isTransitioning.current = true;
     transitionProgress.current = 0;
     if (controlsRef.current) controlsRef.current.enabled = false;
@@ -239,7 +252,7 @@ function CameraController({ phase, onTransitionComplete, controlsRef, resetTrigg
     }
 
     // Update FOV
-    const targetFov = phase === 'exploring' ? CAMERA_EXPLORING.fov : CAMERA_LANDING.fov;
+    const targetFov = camConfig.fov;
     camera.fov += (targetFov - camera.fov) * (ease * 0.08 + 0.02);
     camera.updateProjectionMatrix();
 
@@ -260,7 +273,7 @@ function CameraController({ phase, onTransitionComplete, controlsRef, resetTrigg
 }
 
 // Tree node for landing mode (no interaction, build-up animation)
-function LandingTreeNode({ position, depth, maxDepth }) {
+function LandingTreeNode({ position, depth, maxDepth, msPerLevel = 2000 }) {
   const meshRef = useRef();
 
   const baseColor = useMemo(() => {
@@ -268,7 +281,7 @@ function LandingTreeNode({ position, depth, maxDepth }) {
     return colors[Math.min(depth, colors.length - 1)];
   }, [depth]);
 
-  const levelDelay = (maxDepth - depth) * 2000;
+  const levelDelay = (maxDepth - depth) * msPerLevel;
 
   const { scale } = useSpring({
     from: { scale: 0 },
@@ -385,7 +398,7 @@ function ExploringTreeNode({ position, hash, depth, onClick, proofHighlight }) {
 }
 
 // Landing-mode connection with progressive draw animation
-function LandingConnection({ start, end, childDepth, maxDepth }) {
+function LandingConnection({ start, end, childDepth, maxDepth, msPerLevel = 2000 }) {
   const meshRef = useRef();
 
   const fullGeometry = useMemo(() => {
@@ -401,7 +414,7 @@ function LandingConnection({ start, end, childDepth, maxDepth }) {
     return geom;
   }, [start, end, childDepth, maxDepth]);
 
-  const connectionStartDelay = (maxDepth - childDepth) * 2000 + 800;
+  const connectionStartDelay = (maxDepth - childDepth) * msPerLevel + msPerLevel * 0.4;
 
   const { progress } = useSpring({
     from: { progress: 0 },
@@ -762,9 +775,42 @@ function Scene({ phase, treeData, proofHighlight, onNodeClick, isMobile, onTrans
   const particleCount = isMobile ? 100 : 300;
   const starCount = isMobile ? 1000 : 3000;
 
+  // Reveal animation state — plays a fast leaf-to-root cascade when new data arrives
+  const [isRevealing, setIsRevealing] = useState(false);
+  const revealTimerRef = useRef(null);
+  const [neighborsVisible, setNeighborsVisible] = useState(false);
+
+  useEffect(() => {
+    if (phase === 'exploring' && treeData) {
+      setIsRevealing(true);
+      setNeighborsVisible(false);
+      clearTimeout(revealTimerRef.current);
+      const depth = getTreeDepth(treeData);
+      const totalRevealMs = depth * REVEAL_MS_PER_LEVEL + 1500;
+      revealTimerRef.current = setTimeout(() => setIsRevealing(false), totalRevealMs);
+    }
+    return () => clearTimeout(revealTimerRef.current);
+  }, [treeData, phase]);
+
+  // Show neighbors after reveal completes
+  useEffect(() => {
+    if (phase === 'exploring' && treeData && !isRevealing) {
+      const timer = setTimeout(() => setNeighborsVisible(true), 300);
+      return () => clearTimeout(timer);
+    }
+    setNeighborsVisible(false);
+  }, [isRevealing, treeData, phase]);
+
+  // Disable orbit controls during reveal
+  useEffect(() => {
+    if (controlsRef.current && phase === 'exploring') {
+      controlsRef.current.enabled = !isRevealing;
+    }
+  }, [isRevealing, phase]);
+
   // Determine which data to render
   const displayData = treeData || DEMO_TREE;
-  const isInteractive = phase === 'exploring';
+  const isInteractive = phase === 'exploring' && !isRevealing;
   const yOffset = phase === 'landing' ? 4 : 0;
 
   // Reset group rotation when entering exploring mode
@@ -809,6 +855,9 @@ function Scene({ phase, treeData, proofHighlight, onNodeClick, isMobile, onTrans
     return { nodePositions: positions, connections: conns, maxDepth: maxD };
   }, [displayData, proofHighlight, isInteractive, yOffset]);
 
+  // Dynamic exploring camera — pulls back for larger trees
+  const exploringCamera = useMemo(() => getExploringCamera(maxDepth), [maxDepth]);
+
   // Auto-rotation (only in landing mode)
   useFrame((state) => {
     if (groupRef.current && phase === 'landing') {
@@ -836,10 +885,11 @@ function Scene({ phase, treeData, proofHighlight, onNodeClick, isMobile, onTrans
         onTransitionComplete={onTransitionComplete}
         controlsRef={controlsRef}
         resetTrigger={resetTrigger}
+        exploringCamera={exploringCamera}
       />
 
-      {/* Keyboard pan (arrow keys) */}
-      <KeyboardPan controlsRef={controlsRef} enabled={phase === 'exploring'} />
+      {/* Keyboard pan (arrow keys) — disabled during reveal */}
+      <KeyboardPan controlsRef={controlsRef} enabled={phase === 'exploring' && !isRevealing} />
 
       {/* Orbit controls - only enabled in exploring mode after transition */}
       <OrbitControls
@@ -850,10 +900,10 @@ function Scene({ phase, treeData, proofHighlight, onNodeClick, isMobile, onTrans
         rotateSpeed={0.5}
         zoomSpeed={0.8}
         minDistance={12}
-        maxDistance={50}
+        maxDistance={50 + Math.max(0, maxDepth - 4) * 8}
         maxPolarAngle={Math.PI / 1.5}
         minPolarAngle={Math.PI / 6}
-        target={phase === 'exploring' ? CAMERA_EXPLORING.target : CAMERA_LANDING.target}
+        target={phase === 'exploring' ? exploringCamera.target : CAMERA_LANDING.target}
         autoRotate={phase === 'exploring'}
         autoRotateSpeed={0.4}
       />
@@ -878,6 +928,7 @@ function Scene({ phase, treeData, proofHighlight, onNodeClick, isMobile, onTrans
               end={conn.end}
               childDepth={conn.childDepth}
               maxDepth={maxDepth}
+              msPerLevel={phase === 'exploring' ? REVEAL_MS_PER_LEVEL : 2000}
             />
           )
         ))}
@@ -899,6 +950,7 @@ function Scene({ phase, treeData, proofHighlight, onNodeClick, isMobile, onTrans
               position={nodeData.position}
               depth={nodeData.depth}
               maxDepth={maxDepth}
+              msPerLevel={phase === 'exploring' ? REVEAL_MS_PER_LEVEL : 2000}
             />
           )
         ))}
@@ -920,7 +972,7 @@ function Scene({ phase, treeData, proofHighlight, onNodeClick, isMobile, onTrans
       </group>
 
       {/* Neighbor trees and chain links (outside rotating group — static backdrop) */}
-      {phase === 'exploring' && treeData && neighborBlocks && neighborBlocks.length > 0 && neighborBlocks.map((neighbor) => {
+      {phase === 'exploring' && treeData && neighborsVisible && neighborBlocks && neighborBlocks.length > 0 && neighborBlocks.map((neighbor) => {
         const pos = neighbor.side === 'left' ? [-22, 0, 3] : [22, 0, 3];
         return (
           <React.Fragment key={`neighbor-${neighbor.height}`}>
@@ -940,7 +992,7 @@ function Scene({ phase, treeData, proofHighlight, onNodeClick, isMobile, onTrans
           </React.Fragment>
         );
       })}
-      {phase === 'exploring' && treeData && blockHeight && neighborBlocks && neighborBlocks.length > 0 && (
+      {phase === 'exploring' && treeData && neighborsVisible && blockHeight && neighborBlocks && neighborBlocks.length > 0 && (
         <BlockLabel position={[0, 3, 0]} height={blockHeight} />
       )}
     </>
