@@ -3,7 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Text, Stars } from '@react-three/drei';
 import { useSpring, animated } from '@react-spring/three';
 import * as THREE from 'three';
-import { getTreeDepth } from '../utils/merkle';
+import { getTreeDepth, getTreeStats } from '../utils/merkle';
 
 // Demo tree data - 5 levels with 16 leaves (exported for proof calculation)
 export const DEMO_TREE = {
@@ -103,6 +103,19 @@ const SPREAD_ANGLE = 0.56;
 const SHRINK_FACTOR = 0.72;
 const TARGET_HEIGHT = 18;
 
+function computeLayoutParams(tree) {
+  const { maxDepth, maxBranching } = getTreeStats(tree);
+  const widthFactor = Math.max(1, Math.log2(maxBranching + 1));
+  const adjustedHeight = TARGET_HEIGHT * (1 + (widthFactor - 1) * 0.5);
+  const adjustedShrink = Math.min(0.85, SHRINK_FACTOR + (widthFactor - 1) * 0.04);
+  const adjustedSpread = SPREAD_ANGLE + (widthFactor - 1) * 0.06;
+  const maxFanAngle = Math.PI * Math.min(0.95, 0.7 + (widthFactor - 1) * 0.08);
+  const geoSum = maxDepth > 0
+    ? (1 - Math.pow(adjustedShrink, maxDepth)) / (1 - adjustedShrink) : 1;
+  const branchLen = adjustedHeight / (geoSum * Math.cos(adjustedSpread));
+  return { branchLen, shrinkFactor: adjustedShrink, spreadAngle: adjustedSpread, maxFanAngle };
+}
+
 function hashSeed(name) {
   let h = 0;
   for (let i = 0; i < name.length; i++) {
@@ -137,8 +150,50 @@ function taperRadius(childDepth, maxDepth) {
 const CAMERA_LANDING = { position: [0, 0, 28], target: [0, -2, 0], fov: 60 };
 const CAMERA_EXPLORING = { position: [0, 2, 26], target: [0, -4, 0], fov: 50 };
 
+// Keyboard pan — arrow keys move camera + orbit target together
+function KeyboardPan({ controlsRef, enabled }) {
+  const { camera } = useThree();
+  const keysPressed = useRef(new Set());
+
+  useEffect(() => {
+    if (!enabled) return;
+    const onKeyDown = (e) => {
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        e.preventDefault();
+        keysPressed.current.add(e.key);
+      }
+    };
+    const onKeyUp = (e) => keysPressed.current.delete(e.key);
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      keysPressed.current.clear();
+    };
+  }, [enabled]);
+
+  useFrame((_, delta) => {
+    if (!enabled || !controlsRef.current || keysPressed.current.size === 0) return;
+    const speed = 15 * delta;
+    const right = new THREE.Vector3();
+    const up = new THREE.Vector3();
+    right.setFromMatrixColumn(camera.matrix, 0);
+    up.setFromMatrixColumn(camera.matrix, 1);
+    const offset = new THREE.Vector3();
+    if (keysPressed.current.has('ArrowLeft')) offset.addScaledVector(right, -speed);
+    if (keysPressed.current.has('ArrowRight')) offset.addScaledVector(right, speed);
+    if (keysPressed.current.has('ArrowUp')) offset.addScaledVector(up, speed);
+    if (keysPressed.current.has('ArrowDown')) offset.addScaledVector(up, -speed);
+    camera.position.add(offset);
+    controlsRef.current.target.add(offset);
+  });
+
+  return null;
+}
+
 // Camera controller that smoothly transitions between phases
-function CameraController({ phase, onTransitionComplete, controlsRef }) {
+function CameraController({ phase, onTransitionComplete, controlsRef, resetTrigger }) {
   const { camera } = useThree();
   const targetPos = useRef(new THREE.Vector3(...CAMERA_LANDING.position));
   const targetLookAt = useRef(new THREE.Vector3(...CAMERA_LANDING.target));
@@ -157,6 +212,17 @@ function CameraController({ phase, onTransitionComplete, controlsRef }) {
       controlsRef.current.enabled = false;
     }
   }, [phase, controlsRef]);
+
+  // Reset camera when resetTrigger changes
+  useEffect(() => {
+    if (resetTrigger === 0) return;
+    const target = phase === 'exploring' ? CAMERA_EXPLORING : CAMERA_LANDING;
+    targetPos.current.set(...target.position);
+    targetLookAt.current.set(...target.target);
+    isTransitioning.current = true;
+    transitionProgress.current = 0;
+    if (controlsRef.current) controlsRef.current.enabled = false;
+  }, [resetTrigger]);
 
   useFrame((state, delta) => {
     if (!isTransitioning.current) return;
@@ -420,7 +486,7 @@ function Particles({ count = 200 }) {
 }
 
 // Calculate 3D positions using fractal tree layout
-function calculateTreePositions(node, depth, parentX, parentY, parentAngle, branchLength, positions, yOffset) {
+function calculateTreePositions(node, depth, parentX, parentY, parentAngle, branchLength, positions, yOffset, shrinkFactor = SHRINK_FACTOR, spreadAngle = SPREAD_ANGLE, maxFanAngle = Math.PI * 0.7) {
   if (!node) return positions;
 
   let x, y;
@@ -443,7 +509,7 @@ function calculateTreePositions(node, depth, parentX, parentY, parentAngle, bran
   });
 
   if (node.children && node.children.length > 0) {
-    const childBranchLength = branchLength * SHRINK_FACTOR;
+    const childBranchLength = branchLength * shrinkFactor;
     const jitter = (hashSeed(node.name) - 0.5) * 0.1;
 
     node.children.forEach((child, i) => {
@@ -453,15 +519,15 @@ function calculateTreePositions(node, depth, parentX, parentY, parentAngle, bran
         childAngle = parentAngle;
       } else if (n === 2) {
         const sign = i === 0 ? -1 : 1;
-        const baseSpread = SPREAD_ANGLE + 0.2 / (1 + depth);
+        const baseSpread = spreadAngle + 0.2 / (1 + depth);
         childAngle = parentAngle + sign * (baseSpread + jitter);
       } else {
-        const baseSpread = SPREAD_ANGLE + 0.2 / (1 + depth);
-        const fanWidth = Math.min(baseSpread * 2 * (1 + Math.log2(n)), Math.PI * 0.7);
+        const baseSpread = spreadAngle + 0.2 / (1 + depth);
+        const fanWidth = Math.min(baseSpread * 2 * (1 + Math.log2(n)), maxFanAngle);
         const t = i / (n - 1);
         childAngle = parentAngle - fanWidth / 2 + t * fanWidth + jitter;
       }
-      calculateTreePositions(child, depth + 1, x, y, childAngle, childBranchLength, positions, yOffset);
+      calculateTreePositions(child, depth + 1, x, y, childAngle, childBranchLength, positions, yOffset, shrinkFactor, spreadAngle, maxFanAngle);
     });
   }
 
@@ -556,10 +622,8 @@ function NeighborTree({ treeData, position = [-22, 0, 3], scale = 0.45, startDel
   const groupRef = useRef();
 
   const { nodePositions, connections, maxDepth: neighborMaxDepth } = useMemo(() => {
-    const neighborDepth = getTreeDepth(treeData);
-    const geoSum = neighborDepth > 0 ? (1 - Math.pow(SHRINK_FACTOR, neighborDepth)) / (1 - SHRINK_FACTOR) : 1;
-    const branchLen = TARGET_HEIGHT / (geoSum * Math.cos(SPREAD_ANGLE));
-    const posMap = calculateTreePositions(treeData, 0, 0, 0, 0, branchLen, new Map(), 0);
+    const { branchLen, shrinkFactor, spreadAngle, maxFanAngle } = computeLayoutParams(treeData);
+    const posMap = calculateTreePositions(treeData, 0, 0, 0, 0, branchLen, new Map(), 0, shrinkFactor, spreadAngle, maxFanAngle);
     const positions = Array.from(posMap.values());
 
     const conns = [];
@@ -692,7 +756,7 @@ function BlockLabel({ position, height }) {
 }
 
 // Main scene component
-function Scene({ phase, treeData, proofHighlight, onNodeClick, isMobile, onTransitionComplete, neighborBlocks, blockHeight }) {
+function Scene({ phase, treeData, proofHighlight, onNodeClick, isMobile, onTransitionComplete, neighborBlocks, blockHeight, resetTrigger }) {
   const groupRef = useRef();
   const controlsRef = useRef();
   const particleCount = isMobile ? 100 : 300;
@@ -711,10 +775,8 @@ function Scene({ phase, treeData, proofHighlight, onNodeClick, isMobile, onTrans
   }, [phase]);
 
   const { nodePositions, connections, maxDepth } = useMemo(() => {
-    const treeDepth = getTreeDepth(displayData);
-    const geoSum = treeDepth > 0 ? (1 - Math.pow(SHRINK_FACTOR, treeDepth)) / (1 - SHRINK_FACTOR) : 1;
-    const branchLen = TARGET_HEIGHT / (geoSum * Math.cos(SPREAD_ANGLE));
-    const posMap = calculateTreePositions(displayData, 0, 0, 0, 0, branchLen, new Map(), yOffset);
+    const { branchLen, shrinkFactor, spreadAngle, maxFanAngle } = computeLayoutParams(displayData);
+    const posMap = calculateTreePositions(displayData, 0, 0, 0, 0, branchLen, new Map(), yOffset, shrinkFactor, spreadAngle, maxFanAngle);
     const positions = Array.from(posMap.values());
     const maxD = Math.max(...positions.map(p => p.depth));
 
@@ -773,7 +835,11 @@ function Scene({ phase, treeData, proofHighlight, onNodeClick, isMobile, onTrans
         phase={phase}
         onTransitionComplete={onTransitionComplete}
         controlsRef={controlsRef}
+        resetTrigger={resetTrigger}
       />
+
+      {/* Keyboard pan (arrow keys) */}
+      <KeyboardPan controlsRef={controlsRef} enabled={phase === 'exploring'} />
 
       {/* Orbit controls - only enabled in exploring mode after transition */}
       <OrbitControls
@@ -893,6 +959,7 @@ export default function MerkleScene3D({
   blockHeight = null,
 }) {
   const [notification, setNotification] = useState(null);
+  const [resetTrigger, setResetTrigger] = useState(0);
 
   const handleNodeClick = useCallback((hash) => {
     navigator.clipboard.writeText(hash).catch(() => {});
@@ -916,8 +983,20 @@ export default function MerkleScene3D({
           onTransitionComplete={onTransitionComplete}
           neighborBlocks={neighborBlocks}
           blockHeight={blockHeight}
+          resetTrigger={resetTrigger}
         />
       </Canvas>
+
+      {/* Reset view button */}
+      {phase === 'exploring' && (
+        <button
+          className="reset-view-btn"
+          onClick={() => setResetTrigger(t => t + 1)}
+          title="Reset camera view"
+        >
+          Reset View
+        </button>
+      )}
 
       {/* Hash copy notification */}
       {notification && (

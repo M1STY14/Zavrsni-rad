@@ -8,6 +8,19 @@ import { fetchAdjacentBlocks } from '../systems/bitcoin.js';
 import { fetchAdjacentCommits } from '../systems/git.js';
 import { findProofPath, isLeafNode } from '../utils/merkle.js';
 
+function CloningModal({ repoUrl }) {
+  return (
+    <div className="info-modal-backdrop">
+      <div className="cloning-modal">
+        <div className="cloning-spinner" />
+        <h3>Cloning repository...</h3>
+        <p className="cloning-url">{repoUrl}</p>
+        <p className="cloning-hint">This may take a few seconds for large repositories</p>
+      </div>
+    </div>
+  );
+}
+
 export default function AppShell() {
   // App phase
   const [phase, setPhase] = useState('landing');
@@ -259,12 +272,18 @@ export default function AppShell() {
       {/* Info modal */}
       <InfoModal open={showInfoModal} onClose={() => setShowInfoModal(false)} />
 
+      {/* Cloning progress modal */}
+      {loading && /^https?:\/\/|^git@/.test(inputValues.repoPath || '') && (
+        <CloningModal repoUrl={inputValues.repoPath} />
+      )}
+
       {/* Controls hint (exploring phase with tree) */}
       {phase === 'exploring' && treeData && (
         <div className="controls-hint">
           <div><strong>Controls:</strong></div>
           <div>Click & Drag - Rotate</div>
           <div>Scroll - Zoom</div>
+          <div>Arrow Keys - Pan</div>
           <div>Click Leaf - Show Proof</div>
         </div>
       )}

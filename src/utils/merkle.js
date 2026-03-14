@@ -108,3 +108,17 @@ export function getTreeDepth(tree) {
     if (!tree.children || tree.children.length === 0) return 0;
     return 1 + Math.max(...tree.children.map(getTreeDepth));
 }
+
+/**
+ * Get tree statistics: max depth and max branching factor.
+ */
+export function getTreeStats(tree) {
+    let maxBranching = 0;
+    function walk(node) {
+        if (!node?.children?.length) return;
+        maxBranching = Math.max(maxBranching, node.children.length);
+        node.children.forEach(walk);
+    }
+    walk(tree);
+    return { maxDepth: getTreeDepth(tree), maxBranching };
+}

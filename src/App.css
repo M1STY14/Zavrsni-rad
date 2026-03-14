@@ -269,6 +269,35 @@ button:active {
 }
 
 /* ======================== */
+/* Reset View Button        */
+/* ======================== */
+.reset-view-btn {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  padding: 0.5rem 1.2rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  color: rgba(255, 255, 255, 0.7);
+  transition: all 0.3s ease;
+}
+
+.reset-view-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #00d4ff;
+  border-color: rgba(0, 212, 255, 0.3);
+  box-shadow: 0 4px 15px rgba(0, 212, 255, 0.2);
+  transform: translateX(-50%) translateY(-1px);
+}
+
+/* ======================== */
 /* Info Modal               */
 /* ======================== */
 .info-modal-backdrop {
@@ -409,6 +438,64 @@ button:active {
   font-size: 0.85rem;
   color: rgba(255, 255, 255, 0.4);
   margin: 0.2rem 0;
+}
+
+/* ======================== */
+/* Cloning Modal            */
+/* ======================== */
+.cloning-modal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 2.5rem 3rem;
+  background: rgba(20, 20, 35, 0.92);
+  backdrop-filter: blur(30px);
+  border: 1px solid rgba(0, 212, 255, 0.15);
+  border-radius: 20px;
+  animation: fadeInUp 0.4s ease;
+  text-align: center;
+}
+
+.cloning-modal h3 {
+  font-size: 1.3rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #00d4ff 0%, #667eea 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin: 0;
+  padding: 0;
+}
+
+.cloning-spinner {
+  width: 48px;
+  height: 48px;
+  border: 3px solid rgba(0, 212, 255, 0.15);
+  border-top-color: #00d4ff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.cloning-url {
+  font-family: 'Courier New', monospace;
+  font-size: 0.85rem;
+  color: #b0bec5;
+  max-width: 350px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin: 0;
+}
+
+.cloning-hint {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.4);
+  margin: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 /* ======================== */

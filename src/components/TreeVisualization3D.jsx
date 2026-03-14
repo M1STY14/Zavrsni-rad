@@ -3,12 +3,25 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Text, Stars } from '@react-three/drei';
 import { animated, useSpring } from '@react-spring/three';
 import * as THREE from 'three';
-import { getTreeDepth } from '../utils/merkle';
+import { getTreeStats } from '../utils/merkle';
 
 // Fractal tree layout constants
 const SPREAD_ANGLE = 0.56;
 const SHRINK_FACTOR = 0.72;
 const TARGET_HEIGHT = 18;
+
+function computeLayoutParams(tree) {
+    const { maxDepth, maxBranching } = getTreeStats(tree);
+    const widthFactor = Math.max(1, Math.log2(maxBranching + 1));
+    const adjustedHeight = TARGET_HEIGHT * (1 + (widthFactor - 1) * 0.5);
+    const adjustedShrink = Math.min(0.85, SHRINK_FACTOR + (widthFactor - 1) * 0.04);
+    const adjustedSpread = SPREAD_ANGLE + (widthFactor - 1) * 0.06;
+    const maxFanAngle = Math.PI * Math.min(0.95, 0.7 + (widthFactor - 1) * 0.08);
+    const geoSum = maxDepth > 0
+        ? (1 - Math.pow(adjustedShrink, maxDepth)) / (1 - adjustedShrink) : 1;
+    const branchLen = adjustedHeight / (geoSum * Math.cos(adjustedSpread));
+    return { branchLen, shrinkFactor: adjustedShrink, spreadAngle: adjustedSpread, maxFanAngle };
+}
 
 function hashSeed(name) {
     let h = 0;
@@ -179,7 +192,7 @@ function Particles({ count = 1000 }) {
     );
 }
 
-function calculateTreePositions(node, depth, parentX, parentY, parentAngle, branchLength, positions, yOffset) {
+function calculateTreePositions(node, depth, parentX, parentY, parentAngle, branchLength, positions, yOffset, shrinkFactor = SHRINK_FACTOR, spreadAngle = SPREAD_ANGLE, maxFanAngle = Math.PI * 0.7) {
     if (!node) return positions;
 
     let x, y;
@@ -202,7 +215,7 @@ function calculateTreePositions(node, depth, parentX, parentY, parentAngle, bran
     });
 
     if (node.children && node.children.length > 0) {
-        const childBranchLength = branchLength * SHRINK_FACTOR;
+        const childBranchLength = branchLength * shrinkFactor;
         const jitter = (hashSeed(node.name) - 0.5) * 0.1;
 
         node.children.forEach((child, i) => {
@@ -212,15 +225,15 @@ function calculateTreePositions(node, depth, parentX, parentY, parentAngle, bran
                 childAngle = parentAngle;
             } else if (n === 2) {
                 const sign = i === 0 ? -1 : 1;
-                const baseSpread = SPREAD_ANGLE + 0.2 / (1 + depth);
+                const baseSpread = spreadAngle + 0.2 / (1 + depth);
                 childAngle = parentAngle + sign * (baseSpread + jitter);
             } else {
-                const baseSpread = SPREAD_ANGLE + 0.2 / (1 + depth);
-                const fanWidth = Math.min(baseSpread * 2 * (1 + Math.log2(n)), Math.PI * 0.7);
+                const baseSpread = spreadAngle + 0.2 / (1 + depth);
+                const fanWidth = Math.min(baseSpread * 2 * (1 + Math.log2(n)), maxFanAngle);
                 const t = i / (n - 1);
                 childAngle = parentAngle - fanWidth / 2 + t * fanWidth + jitter;
             }
-            calculateTreePositions(child, depth + 1, x, y, childAngle, childBranchLength, positions, yOffset);
+            calculateTreePositions(child, depth + 1, x, y, childAngle, childBranchLength, positions, yOffset, shrinkFactor, spreadAngle, maxFanAngle);
         });
     }
 
@@ -231,10 +244,8 @@ function Scene({ data, onNodeClick, proofHighlight }) {
     const { nodePositions, connections, maxDepth } = useMemo(() => {
         if (!data) return { nodePositions: [], connections: [], maxDepth: 0 };
 
-        const treeDepth = getTreeDepth(data);
-        const geoSum = treeDepth > 0 ? (1 - Math.pow(SHRINK_FACTOR, treeDepth)) / (1 - SHRINK_FACTOR) : 1;
-        const branchLen = TARGET_HEIGHT / (geoSum * Math.cos(SPREAD_ANGLE));
-        const posMap = calculateTreePositions(data, 0, 0, 0, 0, branchLen, new Map(), 0);
+        const { branchLen, shrinkFactor, spreadAngle, maxFanAngle } = computeLayoutParams(data);
+        const posMap = calculateTreePositions(data, 0, 0, 0, 0, branchLen, new Map(), 0, shrinkFactor, spreadAngle, maxFanAngle);
         const positions = Array.from(posMap.values());
         const maxD = Math.max(...positions.map(p => p.depth));
         const conns = [];
