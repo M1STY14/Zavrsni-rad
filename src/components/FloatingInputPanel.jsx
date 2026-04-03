@@ -59,13 +59,25 @@ export default function FloatingInputPanel({
             {activeSystem.inputs.map(input => (
               <label key={input.key} className="floating-input-label">
                 <span className="floating-input-name">{input.label}</span>
-                <input
-                  type={input.type}
-                  value={inputValues[input.key] || ''}
-                  onChange={(e) => onInputChange(input.key, e.target.value)}
-                  placeholder={input.placeholder}
-                  className="floating-input-field"
-                />
+                {input.type === 'select' ? (
+                  <select
+                    value={inputValues[input.key] || ''}
+                    onChange={(e) => onInputChange(input.key, e.target.value)}
+                    className="floating-input-field"
+                  >
+                    {input.options.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type={input.type}
+                    value={inputValues[input.key] || ''}
+                    onChange={(e) => onInputChange(input.key, e.target.value)}
+                    placeholder={input.placeholder}
+                    className="floating-input-field"
+                  />
+                )}
               </label>
             ))}
           </div>

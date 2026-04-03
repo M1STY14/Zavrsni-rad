@@ -10,7 +10,7 @@ const crypto = require('crypto');
 const MAX_ENTRIES_PER_DIR = 12;
 const MAX_DEPTH = 4;
 const CLONE_DIR = path.join(os.tmpdir(), 'merkle-git-clones');
-const CLONE_TIMEOUT = 30000; // 30s for clone operations
+const CLONE_TIMEOUT = 60000; // 60s for clone operations
 
 // --- Helpers ---
 
@@ -34,17 +34,19 @@ function cloneUrl(url) {
     // Reuse existing clone
     if (fs.existsSync(path.join(cloneDir, '.git'))) {
         try {
-            gitExec('git fetch --depth 2', cloneDir, CLONE_TIMEOUT);
-            gitExec('git reset --hard origin/HEAD', cloneDir, 5000);
+            gitExec('git fetch --filter=blob:none', cloneDir, CLONE_TIMEOUT);
+            // Update local HEAD to match remote after fetch (no working tree to reset)
+            const branch = gitExec('git symbolic-ref --short HEAD', cloneDir);
+            gitExec(`git update-ref refs/heads/${branch} origin/${branch}`, cloneDir);
         } catch {
             // fetch failed, still use stale clone
         }
         return cloneDir;
     }
 
-    // Fresh shallow clone
+    // Fresh blobless clone — we only need tree/commit objects, not file contents
     fs.mkdirSync(CLONE_DIR, { recursive: true });
-    execSync(`git clone --depth 2 --single-branch ${JSON.stringify(url)} ${JSON.stringify(cloneDir)}`, {
+    execSync(`git clone --filter=blob:none --no-checkout --single-branch ${JSON.stringify(url)} ${JSON.stringify(cloneDir)}`, {
         timeout: CLONE_TIMEOUT,
         encoding: 'utf-8',
         env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },

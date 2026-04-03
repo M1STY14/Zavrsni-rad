@@ -6,14 +6,21 @@ const bittorrent = {
     description: 'Visualize Merkle hash trees used for BitTorrent piece verification',
 
     inputs: [
-        { key: 'torrentFile', label: 'Torrent File Path', type: 'text', placeholder: 'Path to .torrent file...' },
-        { key: 'magnetLink', label: 'Magnet Link', type: 'text', placeholder: 'magnet:?xt=urn:btih:...' },
+        { key: 'torrentUrl', label: 'Torrent URL', type: 'text', placeholder: 'https://example.com/file.torrent' },
+        { key: 'demo', label: 'Demo Torrent', type: 'select',
+          options: [
+              { value: '', label: 'Select a demo torrent...' },
+              { value: 'ubuntu-24.04-desktop', label: 'Ubuntu 24.04 Desktop (8 pieces)' },
+              { value: 'sintel-trailer', label: 'Sintel Trailer (5 pieces)' },
+              { value: 'sample-multi', label: 'Multi-file Project (6 pieces)' },
+          ],
+        },
     ],
 
-    hint: 'Provide a .torrent file path or magnet link to visualize the piece hash tree',
+    hint: 'Paste a URL to a .torrent file or pick a demo torrent',
 
-    validate(params) {
-        return !!(params.torrentFile || params.magnetLink);
+    validate() {
+        return true; // Always valid — empty submission loads the default demo
     },
 
     async fetchTree(params) {
@@ -21,8 +28,8 @@ const bittorrent = {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                torrentFile: params.torrentFile,
-                magnetLink: params.magnetLink,
+                torrentUrl: params.torrentUrl || '',
+                demo: params.demo || '',
             }),
         });
 
