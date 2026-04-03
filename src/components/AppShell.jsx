@@ -227,7 +227,7 @@ export default function AppShell() {
         </div>
 
         <div className="main_footer">
-          <p>Leo Kocijan &copy; 2025</p>
+          <p>Leo Kocijan &copy; {new Date().getFullYear()}</p>
           <p>All rights reserved.</p>
         </div>
       </div>
