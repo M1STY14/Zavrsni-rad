@@ -1,14 +1,18 @@
 # Merkle Tree Visualizer
 
-Interactive visualization of Merkle trees in real-world systems including Bitcoin, Git, and BitTorrent.
+Interactive 3D visualization of Merkle trees in real-world systems including Bitcoin, Git, and BitTorrent.
 
 ## Project Structure
 
 ```
 merkle_visualizer/
 ├── src/               # Frontend React application
+│   ├── components/    # UI and 3D visualization components
+│   ├── systems/       # System configs (Bitcoin, Git, BitTorrent)
+│   └── utils/         # Merkle proof utilities
 ├── server/            # Backend Express server
-├── public/            # Static assets
+│   ├── systems/       # System-specific route handlers
+│   └── merkle.js      # Core Merkle tree algorithms
 └── index.html         # Main HTML entry point
 ```
 
@@ -17,21 +21,13 @@ merkle_visualizer/
 ### Prerequisites
 
 - Node.js (v18 or higher)
-- npm or yarn
+- npm
 
 ### Installation
 
-1. **Install frontend dependencies:**
-   ```bash
-   npm install
-   ```
-
-2. **Install backend dependencies:**
-   ```bash
-   cd server
-   npm install
-   cd ..
-   ```
+```bash
+npm install
+```
 
 ### Running the Application
 
@@ -49,52 +45,33 @@ You'll need to run both the frontend and backend servers:
    ```
    Frontend will run on http://localhost:3000
 
-### Available Scripts
+## Features
 
-#### Frontend
-- `npm run dev` - Start development server with Vite
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build
-
-#### Backend
-- `npm run server` - Start the Express backend server
-- `cd server && npm run dev` - Start backend with nodemon (auto-reload)
+- Interactive 3D Merkle tree visualization with Three.js
+- Merkle proof generation, verification, and animated step-by-step visualization
+- Three real-world system integrations:
+  - **Bitcoin** — visualize block transaction trees (demo blocks or Bitcoin Core RPC)
+  - **Git** — visualize commit/tree/blob object hierarchy (local repos or GitHub URLs)
+  - **BitTorrent** — visualize piece hash trees (demo torrents or .torrent URLs)
+- Click leaf nodes to highlight proof paths from leaf to root
+- Adjacent block/commit navigation
+- Fractal tree layout with camera controls (rotate, zoom, pan)
 
 ## Technology Stack
 
 ### Frontend
-- **React 19** - UI library
-- **Vite** - Build tool and dev server
-- **D3.js** - Data visualization
-- **React Router** - Client-side routing
-- **Tailwind CSS** - Styling
-- **Motion** - Animations
+- **React 18** — UI library
+- **Three.js / React Three Fiber** — 3D visualization
+- **Vite** — Build tool and dev server
+- **Tailwind CSS** — Styling
+- **Motion** — Animations
 
 ### Backend
-- **Express** - Web server
-- **Bitcoin Core** - Bitcoin blockchain integration
-- **CORS** - Cross-origin resource sharing
-
-## Features
-
-- Interactive Merkle tree visualization
-- Bitcoin block analysis
-- Custom transaction list visualization
-- Merkle proof generation and verification
-- Zoom and pan capabilities
-- Click to view node details
-
-## Assignment Requirements
-
-This project fulfills the requirement to visualize Merkle trees in at least two real-world systems:
-- ✅ Bitcoin blocks
-- 🚧 Git commits (planned)
-- 🚧 BitTorrent files (planned)
-
-## Development
-
-Built with ⚡ Vite for fast HMR (Hot Module Replacement) and optimized builds.
+- **Express** — Web server
+- **Bitcoin Core RPC** — Bitcoin blockchain integration (optional)
+- **Git CLI** — Git repository parsing
+- **Custom bencode decoder** — Torrent file parsing
 
 ## License
 
-© 2025 Leo Kocijan. All rights reserved.
+Leo Kocijan. All rights reserved.
