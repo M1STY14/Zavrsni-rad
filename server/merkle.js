@@ -101,14 +101,27 @@ function verifyMerkleProof(leafValue, proof, rootHash) {
     return computedHash === rootHash;
 }
 
-function transformTree(node) {
+function countLeaves(node) {
+    if (!node) return 0;
+    if (!node.left && !node.right) return 1;
+    return countLeaves(node.left) + countLeaves(node.right);
+}
+
+function transformTree(node, maxDepth, depth = 0) {
     if (!node) return null;
     const result = { name: node.hash };
     if (node.value !== undefined) result.value = node.value;
-    if (node.left || node.right) {
+    const hasChildren = node.left || node.right;
+    if (hasChildren) {
+        if (maxDepth !== undefined && depth >= maxDepth) {
+            // Collapse deep subtree into a placeholder leaf with a count.
+            result.collapsed = true;
+            result.leafCount = countLeaves(node);
+            return result;
+        }
         result.children = [];
-        if (node.left) result.children.push(transformTree(node.left));
-        if (node.right) result.children.push(transformTree(node.right));
+        if (node.left) result.children.push(transformTree(node.left, maxDepth, depth + 1));
+        if (node.right) result.children.push(transformTree(node.right, maxDepth, depth + 1));
     }
     return result;
 }

@@ -6,12 +6,12 @@ const bitcoin = {
     description: 'Visualize Merkle trees built from Bitcoin block transactions',
 
     inputs: [
-        { key: 'blockHeight', label: 'Block Height', type: 'number', placeholder: '100000 or 500000' },
+        { key: 'blockHeight', label: 'Block Height', type: 'number', placeholder: 'e.g. 800000' },
         { key: 'blockHash', label: 'Block Hash', type: 'text', placeholder: '0000000000...' },
         { key: 'transactions', label: 'Transaction List (comma-separated)', type: 'text', placeholder: 'tx1, tx2, tx3, tx4...' },
     ],
 
-    hint: 'Try Bitcoin block 100000 or 500000 for demo data, or enter custom transactions (e.g., tx1, tx2, tx3, tx4)',
+    hint: 'Enter any real Bitcoin block height or hash (fetched from mempool.space), or a custom transaction list.',
 
     validate(params) {
         return !!(params.blockHeight || params.blockHash || params.transactions);
