@@ -4,9 +4,9 @@ import FloatingInputPanel from './FloatingInputPanel.jsx';
 import ProofVisualization from './ProofVisualization.jsx';
 import InfoModal from './InfoModal.jsx';
 import { systems } from '../systems/index.js';
-import { fetchAdjacentBlocks } from '../systems/bitcoin.js';
+import { fetchAdjacentBlocks, expandSubtree } from '../systems/bitcoin.js';
 import { fetchAdjacentCommits } from '../systems/git.js';
-import { findProofPath, isLeafNode } from '../utils/merkle.js';
+import { findProofPath, isLeafNode, replaceSubtree } from '../utils/merkle.js';
 
 function CloningModal({ repoUrl }) {
   return (
@@ -16,6 +16,19 @@ function CloningModal({ repoUrl }) {
         <h3>Cloning repository...</h3>
         <p className="cloning-url">{repoUrl}</p>
         <p className="cloning-hint">This may take a few seconds for large repositories</p>
+      </div>
+    </div>
+  );
+}
+
+function BlockFetchingModal({ label }) {
+  return (
+    <div className="info-modal-backdrop">
+      <div className="cloning-modal">
+        <div className="cloning-spinner" />
+        <h3>Fetching block from mempool.space</h3>
+        <p className="cloning-url">{label}</p>
+        <p className="cloning-hint">Building Merkle tree — large blocks can have thousands of transactions</p>
       </div>
     </div>
   );
@@ -38,6 +51,7 @@ export default function AppShell() {
   const [proofHighlight, setProofHighlight] = useState(null);
   const [proofData, setProofData] = useState(null);
   const [neighborBlocks, setNeighborBlocks] = useState([]);
+  const [expandingHashes, setExpandingHashes] = useState(() => new Set());
 
   // Mobile detection
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -79,6 +93,7 @@ export default function AppShell() {
     setProofHighlight(null);
     setProofData(null);
     setNeighborBlocks([]);
+    setExpandingHashes(new Set());
   };
 
   const handleInputChange = (key, value) => {
@@ -135,7 +150,30 @@ export default function AppShell() {
     setProofHighlight(null);
     setProofData(null);
     setNeighborBlocks([]);
+    setExpandingHashes(new Set());
   };
+
+  const handleExpandCollapsed = useCallback(async (parentHash) => {
+    if (!rootHash || activeSystem.id !== 'bitcoin') return;
+    setExpandingHashes(prev => {
+      const next = new Set(prev);
+      next.add(parentHash);
+      return next;
+    });
+    try {
+      const subtree = await expandSubtree(rootHash, parentHash);
+      setTreeData(prev => replaceSubtree(prev, parentHash, subtree));
+    } catch (err) {
+      console.error('Error expanding subtree:', err);
+      setError(err.message || 'Failed to expand subtree.');
+    } finally {
+      setExpandingHashes(prev => {
+        const next = new Set(prev);
+        next.delete(parentHash);
+        return next;
+      });
+    }
+  }, [rootHash, activeSystem.id]);
 
   const handleNodeClick = useCallback((hash) => {
     const currentTree = treeData || DEMO_TREE;
@@ -166,6 +204,8 @@ export default function AppShell() {
           treeData={treeData}
           proofHighlight={proofHighlight}
           onNodeClick={handleNodeClick}
+          onExpandCollapsed={handleExpandCollapsed}
+          expandingHashes={expandingHashes}
           isMobile={isMobile}
           onTransitionComplete={handleTransitionComplete}
           neighborBlocks={neighborBlocks}
@@ -275,6 +315,17 @@ export default function AppShell() {
       {/* Cloning progress modal */}
       {loading && /^https?:\/\/|^git@/.test(inputValues.repoPath || '') && (
         <CloningModal repoUrl={inputValues.repoPath} />
+      )}
+
+      {/* Bitcoin block fetching modal */}
+      {loading && activeSystem.id === 'bitcoin' && (inputValues.blockHeight || inputValues.blockHash) && (
+        <BlockFetchingModal
+          label={
+            inputValues.blockHeight
+              ? `Block #${inputValues.blockHeight}`
+              : `${inputValues.blockHash.substring(0, 16)}...`
+          }
+        />
       )}
 
       {/* Controls hint (exploring phase with tree) */}

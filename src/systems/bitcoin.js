@@ -26,6 +26,9 @@ const bitcoin = {
             res = await fetch(`/api/bitcoin/block/${params.blockHash}`);
         } else if (params.transactions) {
             const txs = params.transactions.split(',').map(s => s.trim()).filter(Boolean);
+            if (txs.length > MAX_TX_LIST_SIZE) {
+                throw new Error(`Transaction list capped at ${MAX_TX_LIST_SIZE} entries (got ${txs.length}). For larger sets, load a real block by height or hash.`);
+            }
             res = await fetch('/api/bitcoin/merkle-from-list', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -45,6 +48,19 @@ const bitcoin = {
         };
     },
 };
+
+const MAX_TX_LIST_SIZE = 1024;
+
+export async function expandSubtree(rootHash, parentHash) {
+    const res = await fetch('/api/bitcoin/expand-subtree', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rootHash, parentHash }),
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || 'Failed to expand subtree.');
+    return data.subtree;
+}
 
 export async function fetchAdjacentBlocks(height) {
     const neighbors = [];

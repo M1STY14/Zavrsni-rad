@@ -1,13 +1,35 @@
 const express = require('express');
 const router = express.Router();
-const { createMerkleTree, transformTree, generateMerkleProof } = require('../merkle.js');
+const { createMerkleTree, transformTree, generateMerkleProof, findSubtreeByHash } = require('../merkle.js');
 
 const MEMPOOL_API = 'https://mempool.space/api';
 
 // Cap render depth for on-chain blocks so huge trees (thousands of txs) stay
-// interactive in the 3D scene. Top 5 levels anything deeper
-// collapses into placeholder leaves tagged with the underlying tx count.
-const BLOCK_RENDER_MAX_DEPTH = 5;
+// interactive in the 3D scene. Top 4 levels render directly; anything deeper
+// collapses into placeholder leaves tagged with the underlying tx count and
+// can be expanded on demand via /expand-subtree.
+const BLOCK_RENDER_MAX_DEPTH = 4;
+const EXPAND_DEPTH = 4;
+
+// In-memory LRU cache of full Merkle trees keyed by block hash. Lets us serve
+// /expand-subtree requests without re-fetching txids and re-hashing.
+const TREE_CACHE_SIZE = 16;
+const treeCache = new Map();
+function cacheGet(key) {
+    if (!treeCache.has(key)) return null;
+    const value = treeCache.get(key);
+    treeCache.delete(key);
+    treeCache.set(key, value);
+    return value;
+}
+function cacheSet(key, value) {
+    if (treeCache.has(key)) treeCache.delete(key);
+    treeCache.set(key, value);
+    while (treeCache.size > TREE_CACHE_SIZE) {
+        const oldest = treeCache.keys().next().value;
+        treeCache.delete(oldest);
+    }
+}
 
 async function getBlock(heightOrHash) {
     let hash;
@@ -49,6 +71,7 @@ router.get('/block-by-height/:height', async (req, res) => {
 
         const txids = block.tx.map(tx => tx.txid || tx);
         const tree = createMerkleTree(txids);
+        cacheSet(tree.root.hash, tree.root);
 
         res.json({
             block,
@@ -72,6 +95,7 @@ router.get('/block/:hash', async (req, res) => {
 
         const txids = block.tx.map(tx => tx.txid || tx);
         const tree = createMerkleTree(txids);
+        cacheSet(tree.root.hash, tree.root);
 
         res.json({
             block,
@@ -81,6 +105,36 @@ router.get('/block/:hash', async (req, res) => {
     } catch (err) {
         console.error('Error in block by hash:', err);
         res.status(500).json({ error: 'Error fetching block by hash: ' + err.message });
+    }
+});
+
+// POST /expand-subtree — expand a collapsed node into 4 more levels.
+// Body: { rootHash, parentHash } where rootHash identifies the cached full tree
+// and parentHash is the (collapsed) node the client wants to drill into.
+router.post('/expand-subtree', (req, res) => {
+    try {
+        const { rootHash, parentHash } = req.body || {};
+        if (!rootHash || !parentHash) {
+            return res.status(400).json({ error: 'rootHash and parentHash are required.' });
+        }
+
+        const fullTreeRoot = cacheGet(rootHash);
+        if (!fullTreeRoot) {
+            return res.status(410).json({ error: 'Tree no longer cached — please reload the block.' });
+        }
+
+        const subtreeRoot = findSubtreeByHash(fullTreeRoot, parentHash);
+        if (!subtreeRoot) {
+            return res.status(404).json({ error: 'Subtree not found in cached tree.' });
+        }
+
+        res.json({
+            parentHash,
+            subtree: transformTree(subtreeRoot, EXPAND_DEPTH),
+        });
+    } catch (err) {
+        console.error('Error in expand-subtree:', err);
+        res.status(500).json({ error: 'Error expanding subtree: ' + err.message });
     }
 });
 

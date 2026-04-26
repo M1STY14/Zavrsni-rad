@@ -110,6 +110,25 @@ export function getTreeDepth(tree) {
 }
 
 /**
+ * Return a new tree where the node with `targetHash` is replaced by `replacement`.
+ * Used by the Bitcoin click-to-expand flow to splice a deeper subtree into a
+ * previously collapsed placeholder node.
+ */
+export function replaceSubtree(tree, targetHash, replacement) {
+    if (!tree) return tree;
+    if (tree.name === targetHash) return replacement;
+    if (!tree.children) return tree;
+    let changed = false;
+    const newChildren = tree.children.map(child => {
+        const next = replaceSubtree(child, targetHash, replacement);
+        if (next !== child) changed = true;
+        return next;
+    });
+    if (!changed) return tree;
+    return { ...tree, children: newChildren };
+}
+
+/**
  * Get tree statistics: max depth and max branching factor.
  */
 export function getTreeStats(tree) {

@@ -101,6 +101,15 @@ export const DEMO_TREE = {
 // Reveal animation timing (ms per depth level)
 const REVEAL_MS_PER_LEVEL = 650;
 
+// TODO(perf): viewport-virtualized rendering. Today the scene mounts a
+// react-three-fiber component per node + connection, which scales linearly
+// with tree size and starts to lag once a user expands enough subtrees in a
+// real Bitcoin block (3k+ tx → tens of thousands of meshes). Path forward:
+// switch to a single InstancedMesh for nodes and a merged BufferGeometry for
+// connections, keyed by world-space position; cull anything outside the
+// camera frustum / beyond a depth-of-detail threshold. This is the natural
+// follow-up to the click-to-expand collapsing landed alongside this comment.
+
 // Fractal tree layout constants
 const SPREAD_ANGLE = 0.56;
 const SHRINK_FACTOR = 0.72;
@@ -214,10 +223,17 @@ function CameraController({ phase, onTransitionComplete, controlsRef, resetTrigg
   const transitionProgress = useRef(0);
 
   const camConfig = phase === 'exploring' ? exploringCamera : CAMERA_LANDING;
+  // Track the latest camConfig in a ref so the phase/reset effects don't
+  // re-fire (and yank the camera back to default framing) every time
+  // exploringCamera identity changes — e.g. when a click-to-expand grows
+  // maxDepth. The user's current navigation should be preserved; Reset View
+  // is the explicit way to refit the camera.
+  const camConfigRef = useRef(camConfig);
+  camConfigRef.current = camConfig;
 
   useEffect(() => {
-    targetPos.current.set(...camConfig.position);
-    targetLookAt.current.set(...camConfig.target);
+    targetPos.current.set(...camConfigRef.current.position);
+    targetLookAt.current.set(...camConfigRef.current.target);
     isTransitioning.current = true;
     transitionProgress.current = 0;
 
@@ -225,13 +241,13 @@ function CameraController({ phase, onTransitionComplete, controlsRef, resetTrigg
     if (controlsRef.current) {
       controlsRef.current.enabled = false;
     }
-  }, [phase, controlsRef, camConfig]);
+  }, [phase, controlsRef]);
 
   // Reset camera when resetTrigger changes
   useEffect(() => {
     if (resetTrigger === 0) return;
-    targetPos.current.set(...camConfig.position);
-    targetLookAt.current.set(...camConfig.target);
+    targetPos.current.set(...camConfigRef.current.position);
+    targetLookAt.current.set(...camConfigRef.current.target);
     isTransitioning.current = true;
     transitionProgress.current = 0;
     if (controlsRef.current) controlsRef.current.enabled = false;
@@ -317,7 +333,7 @@ function LandingTreeNode({ position, depth, maxDepth, msPerLevel = 2000 }) {
 }
 
 // Tree node for exploring mode (interactive, proof highlighting)
-function ExploringTreeNode({ position, hash, depth, onClick, proofHighlight }) {
+function ExploringTreeNode({ position, hash, depth, onClick, proofHighlight, collapsed, leafCount, isExpanding }) {
   const meshRef = useRef();
   const [hovered, setHovered] = useState(false);
 
@@ -326,28 +342,35 @@ function ExploringTreeNode({ position, hash, depth, onClick, proofHighlight }) {
   const isSibling = proofHighlight?.siblingHashes?.has(hash);
 
   const baseColor = useMemo(() => {
+    if (collapsed) return '#f7931a'; // Bitcoin orange — signals "click to expand"
     if (isSelected) return '#ff6f00';
     if (isOnPath) return '#ffa726';
     if (isSibling) return '#66bb6a';
     const colors = ['#00d4ff', '#00b8e6', '#667eea', '#764ba2', '#9b59b6'];
     return colors[Math.min(depth, colors.length - 1)];
-  }, [depth, isSelected, isOnPath, isSibling]);
+  }, [depth, isSelected, isOnPath, isSibling, collapsed]);
 
   const emissiveIntensity = useMemo(() => {
+    if (collapsed) return hovered ? 1.4 : 0.9;
     if (isSelected) return 1.2;
     if (isOnPath) return 0.8;
     if (isSibling) return 0.6;
     return hovered ? 1.0 : 0.4;
-  }, [isSelected, isOnPath, isSibling, hovered]);
+  }, [isSelected, isOnPath, isSibling, hovered, collapsed]);
 
   const { scale } = useSpring({
-    scale: hovered ? 1.5 : (isSelected ? 1.4 : (isOnPath || isSibling) ? 1.2 : 1),
+    scale: hovered ? 1.5 : (isSelected ? 1.4 : (isOnPath || isSibling) ? 1.2 : collapsed ? 1.15 : 1),
     config: { mass: 1, tension: 280, friction: 60 },
   });
 
   useFrame((state) => {
-    if (meshRef.current && !hovered) {
-      meshRef.current.position.y = Math.sin(state.clock.elapsedTime + position[0]) * 0.1;
+    if (!meshRef.current) return;
+    const t = state.clock.elapsedTime;
+    if (isExpanding) {
+      // Faster pulse while a subtree fetch is in flight
+      meshRef.current.position.y = Math.sin(t * 6) * 0.05;
+    } else if (!hovered) {
+      meshRef.current.position.y = Math.sin(t + position[0]) * 0.1;
     }
   });
 
@@ -370,17 +393,31 @@ function ExploringTreeNode({ position, hash, depth, onClick, proofHighlight }) {
         />
       </animated.mesh>
 
-      <mesh scale={hovered ? 2.0 : (isOnPath || isSelected) ? 1.8 : 1.5}>
+      <mesh scale={hovered ? 2.0 : (isOnPath || isSelected) ? 1.8 : collapsed ? 1.7 : 1.5}>
         <sphereGeometry args={[0.4, 32, 32]} />
         <meshBasicMaterial
           color={baseColor}
           transparent
-          opacity={hovered ? 0.4 : (isOnPath || isSelected) ? 0.35 : 0.2}
+          opacity={hovered ? 0.4 : (isOnPath || isSelected) ? 0.35 : collapsed ? 0.32 : 0.2}
           side={THREE.BackSide}
         />
       </mesh>
 
-      {hovered && (
+      {collapsed && (
+        <Text
+          position={[0, 0.9, 0]}
+          fontSize={0.32}
+          color="#f7931a"
+          anchorX="center"
+          anchorY="middle"
+          outlineWidth={0.04}
+          outlineColor="#000000"
+        >
+          {isExpanding ? 'expanding...' : `+${leafCount} txs`}
+        </Text>
+      )}
+
+      {hovered && !collapsed && (
         <Text
           position={[0, 1.0, 0]}
           fontSize={0.25}
@@ -391,6 +428,20 @@ function ExploringTreeNode({ position, hash, depth, onClick, proofHighlight }) {
           outlineColor="#000000"
         >
           {hash.substring(0, 8)}...
+        </Text>
+      )}
+
+      {hovered && collapsed && !isExpanding && (
+        <Text
+          position={[0, -0.8, 0]}
+          fontSize={0.2}
+          color="#ffffff"
+          anchorX="center"
+          anchorY="middle"
+          outlineWidth={0.03}
+          outlineColor="#000000"
+        >
+          click to expand
         </Text>
       )}
     </group>
@@ -769,7 +820,7 @@ function BlockLabel({ position, height }) {
 }
 
 // Main scene component
-function Scene({ phase, treeData, proofHighlight, onNodeClick, isMobile, onTransitionComplete, neighborBlocks, blockHeight, resetTrigger }) {
+function Scene({ phase, treeData, proofHighlight, onNodeClick, onExpandCollapsed, expandingHashes, isMobile, onTransitionComplete, neighborBlocks, blockHeight, resetTrigger }) {
   const groupRef = useRef();
   const controlsRef = useRef();
   const particleCount = isMobile ? 100 : 300;
@@ -778,16 +829,23 @@ function Scene({ phase, treeData, proofHighlight, onNodeClick, isMobile, onTrans
   // Reveal animation state — plays a fast leaf-to-root cascade when new data arrives
   const [isRevealing, setIsRevealing] = useState(false);
   const revealTimerRef = useRef(null);
+  const lastRootRef = useRef(null);
   const [neighborsVisible, setNeighborsVisible] = useState(false);
 
   useEffect(() => {
     if (phase === 'exploring' && treeData) {
+      // Only run the reveal cascade when the *root* changes — subtree expansion
+      // keeps the same root and shouldn't re-animate the whole tree.
+      if (lastRootRef.current === treeData.name) return;
+      lastRootRef.current = treeData.name;
       setIsRevealing(true);
       setNeighborsVisible(false);
       clearTimeout(revealTimerRef.current);
       const depth = getTreeDepth(treeData);
       const totalRevealMs = depth * REVEAL_MS_PER_LEVEL + 1500;
       revealTimerRef.current = setTimeout(() => setIsRevealing(false), totalRevealMs);
+    } else if (!treeData) {
+      lastRootRef.current = null;
     }
     return () => clearTimeout(revealTimerRef.current);
   }, [treeData, phase]);
@@ -934,15 +992,27 @@ function Scene({ phase, treeData, proofHighlight, onNodeClick, isMobile, onTrans
         ))}
 
         {/* Nodes */}
-        {nodePositions.map((nodeData) => (
-          isInteractive ? (
+        {nodePositions.map((nodeData) => {
+          const isCollapsed = nodeData.node?.collapsed === true;
+          const leafCount = nodeData.node?.leafCount;
+          const isExpanding = expandingHashes?.has(nodeData.hash);
+          return isInteractive ? (
             <ExploringTreeNode
               key={nodeData.hash}
               position={nodeData.position}
               hash={nodeData.hash}
               depth={nodeData.depth}
-              onClick={() => onNodeClick?.(nodeData.hash)}
+              onClick={() => {
+                if (isCollapsed) {
+                  if (!isExpanding) onExpandCollapsed?.(nodeData.hash);
+                } else {
+                  onNodeClick?.(nodeData.hash);
+                }
+              }}
               proofHighlight={proofHighlight}
+              collapsed={isCollapsed}
+              leafCount={leafCount}
+              isExpanding={isExpanding}
             />
           ) : (
             <LandingTreeNode
@@ -952,8 +1022,8 @@ function Scene({ phase, treeData, proofHighlight, onNodeClick, isMobile, onTrans
               maxDepth={maxDepth}
               msPerLevel={phase === 'exploring' ? REVEAL_MS_PER_LEVEL : 2000}
             />
-          )
-        ))}
+          );
+        })}
 
         {/* Demo neighbor trees — visible on landing and exploring until real data is loaded */}
         {(phase === 'landing' || (phase === 'exploring' && !treeData)) && (() => {
@@ -1005,6 +1075,8 @@ export default function MerkleScene3D({
   treeData = null,
   proofHighlight = null,
   onNodeClick,
+  onExpandCollapsed,
+  expandingHashes,
   isMobile = false,
   onTransitionComplete,
   neighborBlocks = [],
@@ -1031,6 +1103,8 @@ export default function MerkleScene3D({
           treeData={treeData}
           proofHighlight={proofHighlight}
           onNodeClick={handleNodeClick}
+          onExpandCollapsed={onExpandCollapsed}
+          expandingHashes={expandingHashes}
           isMobile={isMobile}
           onTransitionComplete={onTransitionComplete}
           neighborBlocks={neighborBlocks}

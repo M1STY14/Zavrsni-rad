@@ -126,10 +126,19 @@ function transformTree(node, maxDepth, depth = 0) {
     return result;
 }
 
+// Locate a subtree by its root hash inside a fully-built internal tree
+// (the structure produced by createMerkleTree, with `hash`, `left`, `right`).
+function findSubtreeByHash(node, hash) {
+    if (!node) return null;
+    if (node.hash === hash) return node;
+    return findSubtreeByHash(node.left, hash) || findSubtreeByHash(node.right, hash);
+}
+
 // Export funkcija
 module.exports = {
     createMerkleTree,
     generateMerkleProof,
     verifyMerkleProof,
-    transformTree
+    transformTree,
+    findSubtreeByHash
 };
