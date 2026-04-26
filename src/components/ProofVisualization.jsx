@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useT } from '../i18n/index.js';
 
 const ProofVisualization = ({ proofData, onClose }) => {
+    const t = useT();
     const [visibleSteps, setVisibleSteps] = useState(0);
 
     const { selectedLeaf, rootHash, steps } = proofData || {};
@@ -25,20 +27,25 @@ const ProofVisualization = ({ proofData, onClose }) => {
 
     const isVerified = steps && steps.length > 0 && steps[steps.length - 1].parentHash === rootHash;
 
+    const positionLabel = (pos) =>
+        pos === 'left' ? t('proof.sibling_left') : t('proof.sibling_right');
+
     return (
         <div className="proof-panel">
             <div className="proof-header">
-                <h3>Merkle Proof</h3>
+                <h3>{t('proof.title')}</h3>
                 <button onClick={onClose} className="proof-close-btn">&times;</button>
             </div>
 
             <div className="proof-selected-leaf">
-                <span className="proof-label">Selected Leaf</span>
+                <span className="proof-label">{t('proof.selected_leaf')}</span>
                 <code className="proof-hash">{selectedLeaf?.substring(0, 16)}...</code>
             </div>
 
             <div className="proof-steps-container">
-                <div className="proof-step-title">Proof Path ({steps?.length || 0} steps)</div>
+                <div className="proof-step-title">
+                    {t('proof.proof_path')} ({t('proof.step_count', steps?.length || 0)})
+                </div>
 
                 {steps?.map((step, index) => (
                     <div
@@ -49,23 +56,23 @@ const ProofVisualization = ({ proofData, onClose }) => {
                         <div className="proof-step-number">{index + 1}</div>
                         <div className="proof-step-content">
                             <div className="proof-step-node">
-                                <span className="proof-node-label">Node</span>
+                                <span className="proof-node-label">{t('proof.node')}</span>
                                 <code>{step.nodeHash?.substring(0, 12)}...</code>
                             </div>
                             <div className="proof-step-combine">
                                 <span className="proof-combine-icon">
-                                    {step.siblingPosition === 'left' ? '\u2190' : '\u2192'}
+                                    {step.siblingPosition === 'left' ? '←' : '→'}
                                 </span>
                                 <div className="proof-step-sibling">
                                     <span className="proof-sibling-label">
-                                        Sibling ({step.siblingPosition})
+                                        {t('proof.sibling')} ({positionLabel(step.siblingPosition)})
                                     </span>
                                     <code>{step.siblingHash?.substring(0, 12)}...</code>
                                 </div>
                             </div>
                             <div className="proof-step-result">
                                 <span className="proof-result-arrow">&darr;</span>
-                                <span className="proof-result-label">Parent</span>
+                                <span className="proof-result-label">{t('proof.parent')}</span>
                                 <code>{step.parentHash?.substring(0, 12)}...</code>
                             </div>
                         </div>
@@ -75,13 +82,13 @@ const ProofVisualization = ({ proofData, onClose }) => {
 
             {visibleSteps >= (steps?.length || 0) && (
                 <div className={`proof-result-box ${isVerified ? 'proof-verified' : 'proof-failed'}`}>
-                    <span className="proof-result-icon">{isVerified ? '\u2713' : '\u2717'}</span>
+                    <span className="proof-result-icon">{isVerified ? '✓' : '✗'}</span>
                     <div>
                         <div className="proof-result-text">
-                            {isVerified ? 'Proof Verified' : 'Verification Failed'}
+                            {isVerified ? t('proof.verified') : t('proof.failed')}
                         </div>
                         <div className="proof-result-detail">
-                            Root: <code>{rootHash?.substring(0, 16)}...</code>
+                            {t('proof.root')}: <code>{rootHash?.substring(0, 16)}...</code>
                         </div>
                     </div>
                 </div>
@@ -90,15 +97,15 @@ const ProofVisualization = ({ proofData, onClose }) => {
             <div className="proof-legend">
                 <div className="proof-legend-item">
                     <span className="proof-legend-dot" style={{ background: '#ff6f00' }} />
-                    <span>Selected leaf</span>
+                    <span>{t('proof.legend_leaf')}</span>
                 </div>
                 <div className="proof-legend-item">
                     <span className="proof-legend-dot" style={{ background: '#ffa726' }} />
-                    <span>Proof path</span>
+                    <span>{t('proof.legend_path')}</span>
                 </div>
                 <div className="proof-legend-item">
                     <span className="proof-legend-dot" style={{ background: '#66bb6a' }} />
-                    <span>Sibling (evidence)</span>
+                    <span>{t('proof.legend_sibling')}</span>
                 </div>
             </div>
         </div>

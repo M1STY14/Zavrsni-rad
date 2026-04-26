@@ -7,41 +7,65 @@ import { systems } from '../systems/index.js';
 import { fetchAdjacentBlocks, expandSubtree } from '../systems/bitcoin.js';
 import { fetchAdjacentCommits } from '../systems/git.js';
 import { findProofPath, isLeafNode, replaceSubtree } from '../utils/merkle.js';
+import { useLang, useT } from '../i18n/index.js';
 
 function CloningModal({ repoUrl }) {
+  const t = useT();
   return (
     <div className="info-modal-backdrop">
       <div className="cloning-modal">
         <div className="cloning-spinner" />
-        <h3>Cloning repository...</h3>
+        <h3>{t('modals.cloning_title')}</h3>
         <p className="cloning-url">{repoUrl}</p>
-        <p className="cloning-hint">This may take a few seconds for large repositories</p>
+        <p className="cloning-hint">{t('modals.cloning_hint')}</p>
       </div>
     </div>
   );
 }
 
 function BlockFetchingModal({ label }) {
+  const t = useT();
   return (
     <div className="info-modal-backdrop">
       <div className="cloning-modal">
         <div className="cloning-spinner" />
-        <h3>Fetching block from mempool.space</h3>
+        <h3>{t('modals.fetching_title')}</h3>
         <p className="cloning-url">{label}</p>
-        <p className="cloning-hint">Building Merkle tree — large blocks can have thousands of transactions</p>
+        <p className="cloning-hint">{t('modals.fetching_hint')}</p>
       </div>
     </div>
   );
 }
 
+function LanguageSwitcher({ phase }) {
+  const { lang, setLang, langs } = useLang();
+  const t = useT();
+  const labels = { en: 'EN', hr: 'HR' };
+  return (
+    <select
+      className={`lang-select ${phase === 'landing' ? 'lang-select-landing' : ''}`}
+      value={lang}
+      onChange={(e) => setLang(e.target.value)}
+      title={t('buttons.language')}
+      aria-label={t('buttons.language')}
+    >
+      {langs.map((l) => (
+        <option key={l} value={l}>{labels[l] || l.toUpperCase()}</option>
+      ))}
+    </select>
+  );
+}
+
 export default function AppShell() {
+  const t = useT();
+
   // App phase
   const [phase, setPhase] = useState('landing');
   const [heroVisible, setHeroVisible] = useState(true);
   const [panelVisible, setPanelVisible] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
 
-  // Visualization state (from Visualizations.jsx)
+  // Visualization state
   const [activeSystem, setActiveSystem] = useState(systems[0]);
   const [inputValues, setInputValues] = useState({});
   const [rootHash, setRootHash] = useState(null);
@@ -65,7 +89,6 @@ export default function AppShell() {
   const handleStartExploring = () => {
     setPhase('exploring');
     setHeroVisible(false);
-    // Panel slides in after a short delay
     setTimeout(() => setPanelVisible(true), 400);
   };
 
@@ -75,7 +98,6 @@ export default function AppShell() {
     setProofData(null);
     setProofHighlight(null);
     setPhase('landing');
-    // Hero fades back in after camera transition starts
     setTimeout(() => setHeroVisible(true), 600);
   };
 
@@ -102,7 +124,7 @@ export default function AppShell() {
 
   const handleSubmit = async () => {
     if (!activeSystem.validate(inputValues)) {
-      setError('Please fill in at least one input field.');
+      setError(t('errors.fill_one'));
       return;
     }
 
@@ -116,7 +138,6 @@ export default function AppShell() {
       setTreeData(result.tree);
       setRootHash(result.rootHash);
 
-      // Fetch adjacent blocks/commits
       if (activeSystem.id === 'bitcoin' && inputValues.blockHeight) {
         const height = parseInt(inputValues.blockHeight);
         fetchAdjacentBlocks(height).then(setNeighborBlocks);
@@ -136,7 +157,7 @@ export default function AppShell() {
       }
     } catch (err) {
       console.error('Error fetching tree:', err);
-      setError(err.message || 'Error connecting to server');
+      setError(err.message || t('errors.server'));
     } finally {
       setLoading(false);
     }
@@ -223,13 +244,13 @@ export default function AppShell() {
       <div className={`hero-overlay ${heroVisible ? 'hero-visible' : 'hero-exit'}`}>
         <div className="hero-content">
           <h1 className="naslov_zavrsnog_rada">
-            Vizualizacija Merkle stabla
+            {t('hero.title_line1')}
             <br />
-            u stvarnim sustavima
+            {t('hero.title_line2')}
           </h1>
 
           <h1 style={{ fontSize: 'clamp(1.5rem, 3vw, 2rem)', fontWeight: 500, opacity: 0.9 }}>
-            kao sto su:
+            {t('hero.such_as')}
           </h1>
 
           <div className="Scroller">
@@ -256,19 +277,17 @@ export default function AppShell() {
           </div>
 
           <p style={{ marginTop: '2rem', fontSize: '1.15rem', maxWidth: '800px' }}>
-            Ova aplikacija vizualizira Merkle stablo koristeci React i Three.js.
-            Istrazi kako se Merkle stabla koriste u modernim distribuiranim sustavima
-            za osiguravanje integriteta podataka.
+            {t('hero.description')}
           </p>
 
           <button onClick={handleStartExploring} style={{ marginTop: '2rem' }}>
-            Pocni istrazivati
+            {t('hero.start')}
           </button>
         </div>
 
         <div className="main_footer">
           <p>Leo Kocijan &copy; {new Date().getFullYear()}</p>
-          <p>All rights reserved.</p>
+          <p>{t('footer.rights')}</p>
         </div>
       </div>
 
@@ -295,22 +314,30 @@ export default function AppShell() {
 
       {/* Back to home button (exploring phase) */}
       {phase === 'exploring' && (
-        <button className="back-home-btn" onClick={handleBackToLanding} title="Back to Home">
+        <button className="back-home-btn" onClick={handleBackToLanding} title={t('buttons.back_home')}>
           &#8592;
         </button>
       )}
+
+      {/* Language switcher (left of info button) */}
+      <LanguageSwitcher phase={phase} />
 
       {/* Info button */}
       <button
         className={`info-button ${phase === 'landing' ? 'info-button-landing' : ''}`}
         onClick={() => setShowInfoModal(true)}
-        title="About this project"
+        title={t('buttons.about')}
       >
         i
       </button>
 
       {/* Info modal */}
-      <InfoModal open={showInfoModal} onClose={() => setShowInfoModal(false)} />
+      <InfoModal
+        open={showInfoModal}
+        onClose={() => setShowInfoModal(false)}
+        phase={phase}
+        activeSystemId={activeSystem.id}
+      />
 
       {/* Cloning progress modal */}
       {loading && /^https?:\/\/|^git@/.test(inputValues.repoPath || '') && (
@@ -331,11 +358,11 @@ export default function AppShell() {
       {/* Controls hint (exploring phase with tree) */}
       {phase === 'exploring' && treeData && (
         <div className="controls-hint">
-          <div><strong>Controls:</strong></div>
-          <div>Click & Drag - Rotate</div>
-          <div>Scroll - Zoom</div>
-          <div>Arrow Keys - Pan</div>
-          <div>Click Leaf - Show Proof</div>
+          <div><strong>{t('controls.title')}</strong></div>
+          <div>{t('controls.rotate')}</div>
+          <div>{t('controls.zoom')}</div>
+          <div>{t('controls.pan')}</div>
+          <div>{t('controls.proof')}</div>
         </div>
       )}
     </div>

@@ -1,12 +1,15 @@
 import React from 'react';
 import './App.css';
 import AppShell from './components/AppShell.jsx';
+import { LanguageProvider } from './i18n/index.js';
 
 function App() {
     return (
-        <div className="App">
-            <AppShell />
-        </div>
+        <LanguageProvider>
+            <div className="App">
+                <AppShell />
+            </div>
+        </LanguageProvider>
     );
 }
 

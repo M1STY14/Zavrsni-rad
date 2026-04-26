@@ -1,0 +1,127 @@
+const hr = {
+    hero: {
+        title_line1: 'Vizualizacija Merkle stabla',
+        title_line2: 'u stvarnim sustavima',
+        such_as: 'kao što su:',
+        description:
+            'Ova aplikacija vizualizira Merkle stabla koristeći React i Three.js. Istraži kako se Merkle stabla koriste u modernim distribuiranim sustavima za osiguravanje integriteta podataka.',
+        start: 'Počni istraživati',
+    },
+    footer: {
+        rights: 'Sva prava pridržana.',
+    },
+    controls: {
+        title: 'Kontrole',
+        rotate: 'Klik i povuci — Rotacija',
+        zoom: 'Kotačić — Zumiranje',
+        pan: 'Strelice — Pomak',
+        proof: 'Klik na list — Prikaz dokaza',
+    },
+    panel: {
+        title: 'Merkle stablo',
+        expand_title: 'Proširi',
+        collapse_title: 'Sažmi',
+        generate: 'Generiraj',
+        loading: 'Učitavanje…',
+        clear: 'Obriši',
+        root_hash: 'Korijenski hash',
+    },
+    modals: {
+        cloning_title: 'Kloniranje repozitorija…',
+        cloning_hint: 'Za veće repozitorije ovo može potrajati nekoliko sekundi',
+        fetching_title: 'Dohvat bloka s mempool.space',
+        fetching_hint:
+            'Izgradnja Merkle stabla — veliki blokovi mogu imati tisuće transakcija',
+    },
+    buttons: {
+        back_home: 'Natrag na početnu',
+        about: 'O projektu',
+        language: 'Jezik',
+        close: 'Zatvori',
+    },
+    errors: {
+        fill_one: 'Molimo ispunite barem jedno polje.',
+        server: 'Greška pri spajanju na poslužitelj',
+    },
+    proof: {
+        title: 'Merkle dokaz',
+        selected_leaf: 'Odabrani list',
+        proof_path: 'Put dokaza',
+        step_count: (n) => `${n} ${n === 1 ? 'korak' : n < 5 ? 'koraka' : 'koraka'}`,
+        node: 'Čvor',
+        sibling: 'Brat',
+        sibling_left: 'lijevo',
+        sibling_right: 'desno',
+        parent: 'Roditelj',
+        root: 'Korijen',
+        verified: 'Dokaz potvrđen',
+        failed: 'Provjera neuspješna',
+        legend_leaf: 'Odabrani list',
+        legend_path: 'Put dokaza',
+        legend_sibling: 'Brat (dokaz)',
+    },
+    systems: {
+        bitcoin: {
+            name: 'Bitcoin',
+            description: 'Vizualizacija Merkle stabala izgrađenih iz transakcija u Bitcoin blokovima',
+            hint: 'Unesi visinu ili hash stvarnog Bitcoin bloka (dohvaća se s mempool.space), ili vlastiti popis transakcija.',
+            inputs: {
+                blockHeight: { label: 'Visina bloka', placeholder: 'npr. 800000' },
+                blockHash: { label: 'Hash bloka', placeholder: '0000000000…' },
+                transactions: {
+                    label: 'Popis transakcija (odvojen zarezima)',
+                    placeholder: 'tx1, tx2, tx3, tx4…',
+                },
+            },
+        },
+        git: {
+            name: 'Git',
+            description: 'Vizualizacija Merkle stabala iz objekata Git repozitorija',
+            hint: 'Zalijepi GitHub URL ili lokalnu putanju. Ostavi prazno za vizualizaciju ovog projekta na HEAD-u.',
+            inputs: {
+                repoPath: { label: 'Putanja repozitorija', placeholder: 'GitHub URL ili lokalna putanja' },
+                commitHash: { label: 'Hash commita', placeholder: 'HEAD ili SHA commita…' },
+            },
+        },
+        bittorrent: {
+            name: 'BitTorrent',
+            description: 'Vizualizacija Merkle stabala koja se koriste za provjeru komada u BitTorrentu',
+            hint: 'Zalijepi URL .torrent datoteke ili odaberi demo torrent.',
+            inputs: {
+                torrentUrl: {
+                    label: 'URL torrenta',
+                    placeholder: 'https://example.com/file.torrent',
+                },
+                demo: {
+                    label: 'Demo torrent',
+                    options: {
+                        '': 'Odaberi demo torrent…',
+                        'ubuntu-24.04-desktop': 'Ubuntu 24.04 Desktop (8 komada)',
+                        'sintel-trailer': 'Sintel Trailer (5 komada)',
+                        'sample-multi': 'Multi-file projekt (6 komada)',
+                    },
+                },
+            },
+        },
+    },
+    info: {
+        title: 'O projektu',
+        tabs: {
+            general: 'Općenito',
+            bitcoin: 'Bitcoin',
+            git: 'Git',
+            bittorrent: 'BitTorrent',
+        },
+        full_doc_link: 'Pročitaj punu arhitekturnu referencu (ARCHITECTURE.md)',
+        sections: {
+            overview: 'Pregled',
+            dataflow: 'Tok podataka',
+            limitations: 'Poznata ograničenja',
+            proof: 'Generiranje i provjera dokaza',
+        },
+        footer_line1: 'Leo Kocijan © 2025',
+        footer_line2: 'Završni rad — Vizualizacija Merkle stabala u stvarnim sustavima',
+    },
+};
+
+export default hr;
