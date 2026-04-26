@@ -215,10 +215,16 @@ function KeyboardPan({ controlsRef, enabled }) {
 }
 
 // Camera controller that smoothly transitions between phases
+const TRANSITION_DURATION_S = 0.9;
+
 function CameraController({ phase, onTransitionComplete, controlsRef, resetTrigger, exploringCamera }) {
   const { camera } = useThree();
   const targetPos = useRef(new THREE.Vector3(...CAMERA_LANDING.position));
   const targetLookAt = useRef(new THREE.Vector3(...CAMERA_LANDING.target));
+  const startPos = useRef(new THREE.Vector3());
+  const startLookAt = useRef(new THREE.Vector3());
+  const startFov = useRef(CAMERA_LANDING.fov);
+  const targetFov = useRef(CAMERA_LANDING.fov);
   const isTransitioning = useRef(false);
   const transitionProgress = useRef(0);
 
@@ -231,54 +237,55 @@ function CameraController({ phase, onTransitionComplete, controlsRef, resetTrigg
   const camConfigRef = useRef(camConfig);
   camConfigRef.current = camConfig;
 
-  useEffect(() => {
-    targetPos.current.set(...camConfigRef.current.position);
-    targetLookAt.current.set(...camConfigRef.current.target);
+  const beginTransition = () => {
+    const cfg = camConfigRef.current;
+    startPos.current.copy(camera.position);
+    if (controlsRef.current) {
+      startLookAt.current.copy(controlsRef.current.target);
+    } else {
+      startLookAt.current.copy(targetLookAt.current);
+    }
+    startFov.current = camera.fov;
+    targetPos.current.set(...cfg.position);
+    targetLookAt.current.set(...cfg.target);
+    targetFov.current = cfg.fov;
     isTransitioning.current = true;
     transitionProgress.current = 0;
+    if (controlsRef.current) controlsRef.current.enabled = false;
+  };
 
-    // Disable orbit controls during transition
-    if (controlsRef.current) {
-      controlsRef.current.enabled = false;
-    }
+  useEffect(() => {
+    beginTransition();
   }, [phase, controlsRef]);
 
   // Reset camera when resetTrigger changes
   useEffect(() => {
     if (resetTrigger === 0) return;
-    targetPos.current.set(...camConfigRef.current.position);
-    targetLookAt.current.set(...camConfigRef.current.target);
-    isTransitioning.current = true;
-    transitionProgress.current = 0;
-    if (controlsRef.current) controlsRef.current.enabled = false;
+    beginTransition();
   }, [resetTrigger]);
 
   useFrame((state, delta) => {
     if (!isTransitioning.current) return;
 
-    transitionProgress.current += delta * 0.8; // ~1.2s total
+    transitionProgress.current += delta / TRANSITION_DURATION_S;
     const t = Math.min(transitionProgress.current, 1);
-    // Smooth easing
+    // Smooth ease in/out (cubic)
     const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 
-    camera.position.lerp(targetPos.current, ease * 0.08 + 0.02);
-
+    camera.position.lerpVectors(startPos.current, targetPos.current, ease);
     if (controlsRef.current) {
-      controlsRef.current.target.lerp(targetLookAt.current, ease * 0.08 + 0.02);
+      controlsRef.current.target.lerpVectors(startLookAt.current, targetLookAt.current, ease);
     }
-
-    // Update FOV
-    const targetFov = camConfig.fov;
-    camera.fov += (targetFov - camera.fov) * (ease * 0.08 + 0.02);
+    camera.fov = startFov.current + (targetFov.current - startFov.current) * ease;
     camera.updateProjectionMatrix();
 
-    // Check if close enough to target
-    if (camera.position.distanceTo(targetPos.current) < 0.05 && t >= 0.95) {
+    if (t >= 1) {
       isTransitioning.current = false;
       camera.position.copy(targetPos.current);
+      camera.fov = targetFov.current;
+      camera.updateProjectionMatrix();
       if (controlsRef.current) {
         controlsRef.current.target.copy(targetLookAt.current);
-        // Only enable controls in exploring mode
         controlsRef.current.enabled = phase === 'exploring';
       }
       onTransitionComplete?.();
