@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useT } from '../i18n/index.js';
+import { useT } from '../i18n/index.jsx';
 
 const ProofVisualization = ({ proofData, onClose }) => {
     const t = useT();

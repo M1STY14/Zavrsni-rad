@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useLang, useT } from '../i18n/index.js';
+import { useLang, useT } from '../i18n/index.jsx';
 
 const SYSTEM_COLORS = {
   general: '#00d4ff',

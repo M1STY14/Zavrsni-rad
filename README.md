@@ -53,6 +53,8 @@ The app needs both servers running.
 
 No external API keys or local Bitcoin node are required — Bitcoin data is fetched from the public [mempool.space](https://mempool.space) API.
 
+For a deep dive into how each system is fetched, hashed, rendered, and proven — including the deliberate simplifications you should be aware of — see [`ARCHITECTURE.md`](./ARCHITECTURE.md).
+
 ## Features
 
 - **Interactive 3D Merkle tree** with fractal layout, rendered via Three.js / React Three Fiber

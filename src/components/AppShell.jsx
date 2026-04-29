@@ -7,7 +7,7 @@ import { systems } from '../systems/index.js';
 import { fetchAdjacentBlocks, expandSubtree } from '../systems/bitcoin.js';
 import { fetchAdjacentCommits } from '../systems/git.js';
 import { findProofPath, isLeafNode, replaceSubtree } from '../utils/merkle.js';
-import { useLang, useT } from '../i18n/index.js';
+import { useLang, useT } from '../i18n/index.jsx';
 
 function CloningModal({ repoUrl }) {
   const t = useT();

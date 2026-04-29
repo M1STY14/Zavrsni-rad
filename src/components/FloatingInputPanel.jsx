@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { systems } from '../systems/index.js';
-import { useT } from '../i18n/index.js';
+import { useT } from '../i18n/index.jsx';
 
 export default function FloatingInputPanel({
   visible,
