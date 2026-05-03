@@ -101,14 +101,37 @@ function verifyMerkleProof(leafValue, proof, rootHash) {
     return computedHash === rootHash;
 }
 
-function transformTree(node) {
+function countLeaves(node) {
+    if (!node) return 0;
+    if (!node.left && !node.right) return 1;
+    return countLeaves(node.left) + countLeaves(node.right);
+}
+
+function transformTree(node, maxDepth, depth = 0) {
     if (!node) return null;
-    return {
-        name: node.hash,
-        children: node.left && node.right
-            ? [transformTree(node.left), transformTree(node.right)]
-            : []
-    };
+    const result = { name: node.hash };
+    if (node.value !== undefined) result.value = node.value;
+    const hasChildren = node.left || node.right;
+    if (hasChildren) {
+        if (maxDepth !== undefined && depth >= maxDepth) {
+            // Collapse deep subtree into a placeholder leaf with a count.
+            result.collapsed = true;
+            result.leafCount = countLeaves(node);
+            return result;
+        }
+        result.children = [];
+        if (node.left) result.children.push(transformTree(node.left, maxDepth, depth + 1));
+        if (node.right) result.children.push(transformTree(node.right, maxDepth, depth + 1));
+    }
+    return result;
+}
+
+// Locate a subtree by its root hash inside a fully-built internal tree
+// (the structure produced by createMerkleTree, with `hash`, `left`, `right`).
+function findSubtreeByHash(node, hash) {
+    if (!node) return null;
+    if (node.hash === hash) return node;
+    return findSubtreeByHash(node.left, hash) || findSubtreeByHash(node.right, hash);
 }
 
 // Export funkcija
@@ -116,5 +139,6 @@ module.exports = {
     createMerkleTree,
     generateMerkleProof,
     verifyMerkleProof,
-    transformTree
+    transformTree,
+    findSubtreeByHash
 };
