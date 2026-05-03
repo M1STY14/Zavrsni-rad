@@ -55,6 +55,27 @@ No external API keys or local Bitcoin node are required — Bitcoin data is fetc
 
 For a deep dive into how each system is fetched, hashed, rendered, and proven — including the deliberate simplifications you should be aware of — see [`ARCHITECTURE.md`](./ARCHITECTURE.md).
 
+### Running the test suite
+
+The Merkle core (`server/merkle.js`) is covered by a unit-test suite that exercises tree construction, the duplicate-last-leaf rule on odd levels, proof generation and verification round-trips, rejection of tampered proofs, and the depth-cap collapsing used by the 3D renderer:
+
+```bash
+npm test
+```
+
+No additional dev dependencies are required — the suite uses Node's built-in `node:test` runner.
+
+### Running with Docker
+
+A multi-stage `Dockerfile` is provided that builds the Vite frontend and serves it from the Express backend on a single port (`4000`):
+
+```bash
+docker build -t merkle-visualizer .
+docker run --rm -p 4000:4000 merkle-visualizer
+```
+
+Then open <http://localhost:4000>. The image includes the `git` CLI so the Git-system integration works for any clonable URL.
+
 ## Features
 
 - **Interactive 3D Merkle tree** with fractal layout, rendered via Three.js / React Three Fiber

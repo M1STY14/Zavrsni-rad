@@ -1,0 +1,34 @@
+# Dependencies (re-installed inside the image)
+node_modules
+server/node_modules
+
+# Build artifacts (rebuilt inside the image)
+build
+dist
+coverage
+
+# Local environment & editor files
+.env
+.env.*
+.vscode
+.idea
+.DS_Store
+
+# Git metadata — not needed in the image
+.git
+.gitignore
+.github
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Docker artifacts themselves
+Dockerfile
+.dockerignore
+
+# Docs that don't need to ship in the image
+README.md
+ARCHITECTURE.md
