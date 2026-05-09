@@ -3,6 +3,11 @@ const router = express.Router();
 const { createMerkleTree, transformTree, generateMerkleProof, findSubtreeByHash } = require('../merkle.js');
 
 const MEMPOOL_API = 'https://mempool.space/api';
+const FETCH_TIMEOUT_MS = 10_000;
+
+function fetchWithTimeout(url) {
+    return fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+}
 
 // Cap render depth for on-chain blocks so huge trees (thousands of txs) stay
 // interactive in the 3D scene. Top 4 levels render directly; anything deeper
@@ -34,7 +39,7 @@ function cacheSet(key, value) {
 async function getBlock(heightOrHash) {
     let hash;
     if (typeof heightOrHash === 'number') {
-        const res = await fetch(`${MEMPOOL_API}/block-height/${heightOrHash}`);
+        const res = await fetchWithTimeout(`${MEMPOOL_API}/block-height/${heightOrHash}`);
         if (!res.ok) return null;
         hash = (await res.text()).trim();
     } else {
@@ -42,8 +47,8 @@ async function getBlock(heightOrHash) {
     }
 
     const [metaRes, txidsRes] = await Promise.all([
-        fetch(`${MEMPOOL_API}/block/${hash}`),
-        fetch(`${MEMPOOL_API}/block/${hash}/txids`),
+        fetchWithTimeout(`${MEMPOOL_API}/block/${hash}`),
+        fetchWithTimeout(`${MEMPOOL_API}/block/${hash}/txids`),
     ]);
 
     if (!metaRes.ok || !txidsRes.ok) return null;

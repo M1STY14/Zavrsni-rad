@@ -1,5 +1,7 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const bodyParser = require('body-parser');
 const path = require('path');
 const fs = require('fs');
@@ -12,8 +14,28 @@ const bittorrentRoutes = require('./systems/bittorrent');
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-app.use(cors());
+// Trust the reverse proxy (nginx/caddy on the VPS) so rate-limit sees real client IPs.
+app.set('trust proxy', 1);
+
+const allowedOrigins = (process.env.CORS_ORIGINS || 'https://mtv.leokocijan.dev,http://localhost:3000')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+
+// CSP disabled — Three.js + Vite assets need permissive script/style/image rules
+// that the default policy blocks. The app is read-only and serves no user HTML,
+// so the other helmet defaults (HSTS, nosniff, frameguard, referrer policy) are
+// the ones doing real work here.
+app.use(helmet({ contentSecurityPolicy: false }));
+app.use(cors({ origin: allowedOrigins }));
 app.use(bodyParser.json());
+
+app.use('/api/', rateLimit({
+    windowMs: 60 * 1000,
+    limit: 100,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+}));
 
 // Mount system routes under /api/<system>/
 app.use('/api/bitcoin', bitcoinRoutes);

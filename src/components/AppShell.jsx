@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import MerkleScene3D, { DEMO_TREE } from './MerkleScene3D.jsx';
+import SceneErrorBoundary from './SceneErrorBoundary.jsx';
 import FloatingInputPanel from './FloatingInputPanel.jsx';
 import ProofVisualization from './ProofVisualization.jsx';
 import InfoModal from './InfoModal.jsx';
@@ -220,24 +221,26 @@ export default function AppShell() {
     <div className="app-shell">
       {/* Full-screen 3D canvas - always mounted */}
       <div className="scene-container">
-        <MerkleScene3D
-          phase={phase}
-          treeData={treeData}
-          proofHighlight={proofHighlight}
-          onNodeClick={handleNodeClick}
-          onExpandCollapsed={handleExpandCollapsed}
-          expandingHashes={expandingHashes}
-          isMobile={isMobile}
-          onTransitionComplete={handleTransitionComplete}
-          neighborBlocks={neighborBlocks}
-          blockHeight={
-            activeSystem.id === 'bitcoin' && inputValues.blockHeight
-              ? parseInt(inputValues.blockHeight)
-              : activeSystem.id === 'git' && treeData
-                ? (inputValues.commitHash || 'HEAD').substring(0, 7)
-                : null
-          }
-        />
+        <SceneErrorBoundary>
+          <MerkleScene3D
+            phase={phase}
+            treeData={treeData}
+            proofHighlight={proofHighlight}
+            onNodeClick={handleNodeClick}
+            onExpandCollapsed={handleExpandCollapsed}
+            expandingHashes={expandingHashes}
+            isMobile={isMobile}
+            onTransitionComplete={handleTransitionComplete}
+            neighborBlocks={neighborBlocks}
+            blockHeight={
+              activeSystem.id === 'bitcoin' && inputValues.blockHeight
+                ? parseInt(inputValues.blockHeight)
+                : activeSystem.id === 'git' && treeData
+                  ? (inputValues.commitHash || 'HEAD').substring(0, 7)
+                  : null
+            }
+          />
+        </SceneErrorBoundary>
       </div>
 
       {/* Hero content overlay (landing phase) */}
