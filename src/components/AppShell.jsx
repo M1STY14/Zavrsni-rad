@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import MerkleScene3D, { DEMO_TREE } from './MerkleScene3D.jsx';
 import SceneErrorBoundary from './SceneErrorBoundary.jsx';
 import FloatingInputPanel from './FloatingInputPanel.jsx';
@@ -7,7 +7,8 @@ import InfoModal from './InfoModal.jsx';
 import { systems } from '../systems/index.js';
 import { fetchAdjacentBlocks, expandSubtree } from '../systems/bitcoin.js';
 import { fetchAdjacentCommits } from '../systems/git.js';
-import { findProofPath, isLeafNode, replaceSubtree } from '../utils/merkle.js';
+import { findNode, replaceSubtree } from '../utils/merkle.js';
+import { verifyBinaryMerkleProof, verifyBitcoinMerkleProof, verifyGitProof } from '../utils/proof-verifier.js';
 import { useLang, useT } from '../i18n/index.jsx';
 
 function CloningModal({ repoUrl }) {
@@ -75,6 +76,7 @@ export default function AppShell() {
   const [error, setError] = useState(null);
   const [proofHighlight, setProofHighlight] = useState(null);
   const [proofData, setProofData] = useState(null);
+  const [clickHint, setClickHint] = useState(null);
   const [neighborBlocks, setNeighborBlocks] = useState([]);
   const [expandingHashes, setExpandingHashes] = useState(() => new Set());
 
@@ -197,20 +199,132 @@ export default function AppShell() {
     }
   }, [rootHash, activeSystem.id]);
 
-  const handleNodeClick = useCallback((hash) => {
+  const handleNodeClick = useCallback(async (hash) => {
     const currentTree = treeData || DEMO_TREE;
     const currentRoot = rootHash || DEMO_TREE.name;
 
-    if (!isLeafNode(currentTree, hash)) {
+    const node = findNode(currentTree, hash);
+    const isRealLeaf = node && !node.children?.length && !node.collapsed && node.value !== undefined;
+    if (!isRealLeaf) {
       setProofHighlight(null);
       setProofData(null);
+      // Tell the user why nothing happened. Max-depth placeholders carry a
+      // "/ (max depth)" sentinel value from buildGitTree; everything else
+      // with children is just an internal node.
+      const isMaxDepth = typeof node?.value === 'string' && node.value.endsWith('(max depth)');
+      setClickHint(isMaxDepth ? t('proof.hint_max_depth') : t('proof.hint_internal_node'));
+      return;
+    }
+    setClickHint(null);
+
+    // Git: server walks tree DAG with git's hash rules, client re-hashes each
+    // tree's binary serialization with SHA-1 to verify byte-correctness.
+    if (activeSystem.id === 'git') {
+      try {
+        if (!node.path) {
+          throw new Error('Selected leaf has no path metadata.');
+        }
+        const res = await fetch('/api/git/proof', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            repoPath: inputValues.repoPath || '',
+            commitRef: inputValues.commitHash || 'HEAD',
+            blobPath: node.path,
+          }),
+        });
+        const proof = await res.json();
+        if (!res.ok) throw new Error(proof.error || 'Proof generation failed.');
+
+        const verification = await verifyGitProof(proof);
+
+        const pathHashes = new Set([hash, ...proof.treeChain.map(t => t.sha), proof.commit.sha]);
+        setProofHighlight({ selectedLeaf: hash, pathHashes, siblingHashes: new Set() });
+        setProofData({
+          kind: 'git-tree',
+          proof,
+          checks: verification.checks,
+          verified: verification.ok,
+          verifyReason: verification.reason,
+        });
+      } catch (err) {
+        console.error('Git proof error:', err);
+        setProofHighlight(null);
+        setProofData({
+          kind: 'git-tree',
+          proof: { blob: { path: node.path || '?' }, commit: { sha: '' }, treeChain: [] },
+          checks: [],
+          verified: false,
+          verifyReason: err.message,
+        });
+      }
       return;
     }
 
-    const { pathHashes, siblingHashes, steps } = findProofPath(currentTree, hash);
-    setProofHighlight({ selectedLeaf: hash, pathHashes, siblingHashes });
-    setProofData({ selectedLeaf: hash, rootHash: currentRoot, steps });
-  }, [treeData, rootHash]);
+    // Bitcoin / BitTorrent: ask the server for an authoritative proof, then
+    // re-run the hash chain locally with Web Crypto so the green check is real.
+    try {
+      const endpoint = activeSystem.id === 'bitcoin'
+        ? '/api/bitcoin/proof'
+        : '/api/bittorrent/proof';
+      const body = activeSystem.id === 'bitcoin'
+        ? { rootHash: currentRoot, txid: node.value }
+        : { rootHash: currentRoot, pieceHash: node.value };
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const proof = await res.json();
+      if (!res.ok) throw new Error(proof.error || 'Proof generation failed.');
+
+      const verification = proof.kind === 'bitcoin-merkle'
+        ? await verifyBitcoinMerkleProof(proof)
+        : await verifyBinaryMerkleProof(proof);
+
+      const pathHashes = new Set([proof.leaf.hash, ...proof.steps.map(s => s.parentHash)]);
+      const siblingHashes = new Set(proof.steps.map(s => s.siblingHash));
+
+      setProofHighlight({ selectedLeaf: proof.leaf.hash, pathHashes, siblingHashes });
+      setProofData({
+        selectedLeaf: proof.leaf.hash,
+        rootHash: proof.rootHash,
+        steps: proof.steps,
+        verified: verification.ok,
+        verifyReason: verification.reason,
+      });
+    } catch (err) {
+      console.error('Proof error:', err);
+      setProofHighlight(null);
+      setProofData({
+        selectedLeaf: hash,
+        rootHash: currentRoot,
+        steps: [],
+        verified: false,
+        verifyReason: err.message,
+      });
+    }
+  }, [treeData, rootHash, activeSystem.id, inputValues.repoPath, inputValues.commitHash, t]);
+
+  // Auto-dismiss the click hint after a few seconds.
+  useEffect(() => {
+    if (!clickHint) return;
+    const id = setTimeout(() => setClickHint(null), 3500);
+    return () => clearTimeout(id);
+  }, [clickHint]);
+
+  // A tree is truncated when any of its descendants is a `collapsed: true`
+  // placeholder. Drives the "click `… more` to drill deeper" banner.
+  const isTruncated = useMemo(() => {
+    if (!treeData) return false;
+    function walk(node) {
+      if (!node) return false;
+      if (node.collapsed) return true;
+      return node.children?.some(walk) ?? false;
+    }
+    return walk(treeData);
+  }, [treeData]);
 
   const handleCloseProof = () => {
     setProofHighlight(null);
@@ -312,6 +426,54 @@ export default function AppShell() {
       {proofData && (
         <div className="proof-panel-floating">
           <ProofVisualization proofData={proofData} onClose={handleCloseProof} />
+        </div>
+      )}
+
+      {/* Truncation banner — shown when a Bitcoin block is too deep to render
+          fully and the user needs to drill via "… more" placeholders. */}
+      {phase === 'exploring' && activeSystem.id === 'bitcoin' && isTruncated && (
+        <div className="truncation-banner" style={{
+          position: 'fixed',
+          top: '1rem',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          padding: '0.6rem 1.1rem',
+          borderRadius: '0.5rem',
+          background: 'rgba(20, 20, 20, 0.92)',
+          color: '#eee',
+          fontSize: '0.88rem',
+          maxWidth: 'min(640px, calc(100vw - 2rem))',
+          textAlign: 'center',
+          border: '1px solid rgba(247, 147, 26, 0.4)',
+          backdropFilter: 'blur(8px)',
+          zIndex: 30,
+          pointerEvents: 'none',
+        }}>
+          {t('proof.banner_truncated')}
+        </div>
+      )}
+
+      {/* Click hint toast — shows briefly when a click can't produce a proof. */}
+      {clickHint && (
+        <div className="click-hint-toast" style={{
+          position: 'fixed',
+          bottom: '1.5rem',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          padding: '0.65rem 1.1rem',
+          borderRadius: '0.5rem',
+          background: 'rgba(20, 20, 20, 0.94)',
+          color: '#eee',
+          fontSize: '0.9rem',
+          maxWidth: 'min(560px, calc(100vw - 2rem))',
+          textAlign: 'center',
+          border: '1px solid rgba(255, 255, 255, 0.12)',
+          boxShadow: '0 6px 24px rgba(0, 0, 0, 0.35)',
+          backdropFilter: 'blur(8px)',
+          zIndex: 40,
+          pointerEvents: 'none',
+        }}>
+          {clickHint}
         </div>
       )}
 

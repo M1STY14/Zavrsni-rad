@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { createMerkleTree, transformTree, generateMerkleProof, findSubtreeByHash } = require('../merkle.js');
+const { createMerkleTree, transformTree, generateRichProof, findSubtreeByHash } = require('../merkle.js');
+const { buildBitcoinMerkleTree, generateBitcoinProof } = require('./bitcoin-merkle.js');
 
 const MEMPOOL_API = 'https://mempool.space/api';
 const FETCH_TIMEOUT_MS = 10_000;
@@ -75,8 +76,8 @@ router.get('/block-by-height/:height', async (req, res) => {
         }
 
         const txids = block.tx.map(tx => tx.txid || tx);
-        const tree = createMerkleTree(txids);
-        cacheSet(tree.root.hash, tree.root);
+        const tree = buildBitcoinMerkleTree(txids);
+        cacheSet(tree.root.hash, { tree, algo: 'bitcoin' });
 
         res.json({
             block,
@@ -99,8 +100,8 @@ router.get('/block/:hash', async (req, res) => {
         }
 
         const txids = block.tx.map(tx => tx.txid || tx);
-        const tree = createMerkleTree(txids);
-        cacheSet(tree.root.hash, tree.root);
+        const tree = buildBitcoinMerkleTree(txids);
+        cacheSet(tree.root.hash, { tree, algo: 'bitcoin' });
 
         res.json({
             block,
@@ -123,12 +124,12 @@ router.post('/expand-subtree', (req, res) => {
             return res.status(400).json({ error: 'rootHash and parentHash are required.' });
         }
 
-        const fullTreeRoot = cacheGet(rootHash);
-        if (!fullTreeRoot) {
+        const cached = cacheGet(rootHash);
+        if (!cached) {
             return res.status(410).json({ error: 'Tree no longer cached — please reload the block.' });
         }
 
-        const subtreeRoot = findSubtreeByHash(fullTreeRoot, parentHash);
+        const subtreeRoot = findSubtreeByHash(cached.tree.root, parentHash);
         if (!subtreeRoot) {
             return res.status(404).json({ error: 'Subtree not found in cached tree.' });
         }
@@ -152,6 +153,7 @@ router.post('/merkle-from-list', (req, res) => {
         }
 
         const tree = createMerkleTree(transactions);
+        cacheSet(tree.root.hash, { tree, algo: 'didactic' });
 
         res.json({
             rootHash: tree.root.hash,
@@ -160,6 +162,53 @@ router.post('/merkle-from-list', (req, res) => {
     } catch (err) {
         console.error('Error in merkle-from-list:', err);
         res.status(500).json({ error: 'Error generating tree: ' + err.message });
+    }
+});
+
+// POST /proof — server-authoritative Merkle proof for a cached tree.
+// Body: { rootHash, txid }. Looks up the full tree cached by /block-by-* or
+// /merkle-from-list, runs generateRichProof, returns the binary-merkle envelope
+// the client renders + verifies via Web Crypto.
+router.post('/proof', (req, res) => {
+    try {
+        const { rootHash, txid } = req.body || {};
+        if (!rootHash || !txid) {
+            return res.status(400).json({ error: 'rootHash and txid are required.' });
+        }
+
+        const cached = cacheGet(rootHash);
+        if (!cached) {
+            return res.status(410).json({ error: 'Tree no longer cached — please reload the block.' });
+        }
+
+        // Real Bitcoin trees use double-SHA-256 over binary pairs; the didactic
+        // path (custom tx lists) keeps merkle.js's single-SHA-256-over-hex.
+        // Each branch returns its own envelope kind so the verifier knows which
+        // hash chain to re-run.
+        if (cached.algo === 'bitcoin') {
+            const { leafHash, steps } = generateBitcoinProof(cached.tree, txid);
+            return res.json({
+                kind: 'bitcoin-merkle',
+                rootHash,
+                leaf: { value: txid, hash: leafHash },
+                steps,
+            });
+        }
+
+        const { leafHash, steps } = generateRichProof(cached.tree, txid);
+
+        res.json({
+            kind: 'binary-merkle',
+            rootHash,
+            leaf: { value: txid, hash: leafHash },
+            steps,
+        });
+    } catch (err) {
+        if (err.message === 'Leaf not found in tree.') {
+            return res.status(404).json({ error: `Transaction '${req.body?.txid}' not found in this tree.` });
+        }
+        console.error('Error in proof:', err);
+        res.status(500).json({ error: 'Error generating proof: ' + err.message });
     }
 });
 

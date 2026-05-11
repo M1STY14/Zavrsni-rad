@@ -172,6 +172,33 @@ function GeneralContent({ lang, t }) {
             Otvori karticu pojedinog sustava da vidiš točan tok podataka i ograničenja.
           </p>
         </Card>
+
+        <Card accent="#9b7fc6" title="Merkle stablo nasuprot Merkle DAG-u">
+          <p>
+            Iako sva tri sustava posjeduju "Merkle svojstvo" (promjena na bilo kojem listu mijenja
+            korijen), <strong>strukture nisu iste</strong> — i to mijenja oblik dokaza.
+          </p>
+          <p style={{ marginTop: '0.6rem' }}>
+            <strong>Bitcoin i BitTorrent</strong> grade <em>klasično binarno Merkle stablo</em>{' '}
+            iznad ravne liste vrijednosti (txid-ovi, hashovi komada). Svaki unutarnji čvor ima
+            točno dva djeteta; roditelj se računa kao <code>hash(lijevi || desni)</code>. Dokaz je{' '}
+            <code>O(log n)</code> hash-eva — samo bratski hash na svakoj razini puta od lista do
+            korijena.
+          </p>
+          <p style={{ marginTop: '0.6rem' }}>
+            <strong>Git</strong> nije binarno stablo, već <em>Merkle DAG tipiziranih objekata</em>:
+            tree objekti (popisi direktorija) povezuju blob objekte (sadržaj datoteka). Hash tree
+            objekta računa se nad <em>cijelom serijaliziranom listom unosa</em> (mode, ime, dijete
+            sha) — ne nad parovima. Zato dokaz da blob pripada commitu mora prikazati{' '}
+            <em>cijelu listu unosa</em> svakog tree-a na putu, ne samo bratski hash. To je{' '}
+            <code>O(dubina × stupanj)</code> bajtova, ali dokazuje i točan put datoteke u repozitoriju.
+          </p>
+          <p style={{ marginTop: '0.6rem' }}>
+            Vizualizacija pokušava jezgrovito prikazati ovu razliku: Bitcoin/BitTorrent kartica
+            pokazuje par-i-hashiraj, Git kartica pokazuje rekonstrukciju cijelog tree objekta i
+            usporedbu izračunatog SHA-1 sa onim koji git navodi.
+          </p>
+        </Card>
       </>
     );
   }
@@ -223,6 +250,33 @@ function GeneralContent({ lang, t }) {
           Open a system tab to see the exact data flow and limitations.
         </p>
       </Card>
+
+      <Card accent="#9b7fc6" title="Merkle tree vs. Merkle DAG">
+        <p>
+          All three systems share the Merkle property (changing any leaf changes the root), but{' '}
+          <strong>the structures are not the same</strong> — and that changes the proof shape.
+        </p>
+        <p style={{ marginTop: '0.6rem' }}>
+          <strong>Bitcoin and BitTorrent</strong> build a <em>classic binary Merkle tree</em>{' '}
+          over a flat list of values (txids, piece hashes). Every internal node has exactly two
+          children; the parent is computed as <code>hash(left || right)</code>. The proof is{' '}
+          <code>O(log n)</code> hashes — one sibling per level on the leaf-to-root path.
+        </p>
+        <p style={{ marginTop: '0.6rem' }}>
+          <strong>Git</strong> is not a binary tree but a <em>Merkle DAG of typed objects</em>:
+          tree objects (directory listings) link to blob objects (file contents). A tree's hash
+          is computed over the <em>entire serialized entry list</em> (mode, name, child sha) —
+          not over pairs. So a proof that a blob belongs to a commit must reveal{' '}
+          <em>the full entry list</em> of every tree on the path, not just sibling hashes. That's{' '}
+          <code>O(depth × fanout)</code> bytes, but it also proves the file's exact path in the
+          repository.
+        </p>
+        <p style={{ marginTop: '0.6rem' }}>
+          The visualization tries to make the contrast tangible: the Bitcoin / BitTorrent panels
+          show pair-and-hash steps, while the Git panel shows full tree-object reconstruction
+          with the recomputed SHA-1 compared against the one git reports.
+        </p>
+      </Card>
     </>
   );
 }
@@ -270,20 +324,21 @@ function BitcoinContent({ lang, t }) {
         <Section title={t('info.sections.limitations')}>
           <ul>
             <li>
-              <strong>Pojednostavljenje hashiranja:</strong> aplikacija koristi{' '}
-              <em>jednostruki</em> SHA-256 nad <em>hex</em> konkatenacijom djece. Stvarni
-              Bitcoin koristi <em>dvostruki</em> SHA-256 nad <em>byte-reversed</em> binarnim
-              oblikom. Korijen koji ova aplikacija ispiše neće biti identičan stvarnom korijenu
-              iz zaglavlja bloka — struktura i mehanika dokaza su iste, samo bytewise rezultati
-              razlikuju.
+              <strong>Dva načina hashiranja:</strong> kada se učita stvarni blok preko visine ili
+              hash-a, aplikacija koristi <em>stvaran Bitcoin algoritam</em> —{' '}
+              <code>SHA-256(SHA-256(left_bin || right_bin))</code> nad txid-ovima u internom
+              redoslijedu bajtova. Korijen koji se prikaže odgovara byte-for-byte onome u zaglavlju
+              bloka. Kada korisnik upiše vlastitu listu transakcija, koristi se <em>didaktička</em>{' '}
+              varijanta — jednostruki SHA-256 nad hex konkatenacijom — jer korisnički unos nisu
+              stvarni txid-ovi.
             </li>
             <li>
               Pravilo dupliciranja zadnjeg lista za neparan broj listova je implementirano kao
-              kod stvarnog Bitcoina.
+              kod stvarnog Bitcoina, u oba načina.
             </li>
             <li>Render je ograničen na 4 razine; sve dublje učitava se na klik.</li>
             <li>
-              Cache podržava 16 najnovijih blokova. Nakon evikcije, expand zahtijeva ponovno
+              Cache podržava 16 najnovijih blokova. Nakon evikcije, dokaz zahtijeva ponovno
               učitavanje bloka.
             </li>
           </ul>
@@ -291,10 +346,12 @@ function BitcoinContent({ lang, t }) {
 
         <Section title={t('info.sections.proof')}>
           <p>
-            Klikom na list (transakciju) frontend traverzira stablo do korijena, prikupljajući
-            jednog brata po razini. Dokaz je <code>O(log n)</code> hashova — za blok od 4096
-            transakcija ~12 hashova (≈384 B). Verifikacija ponovno hashira put prema gore;
-            animacija prati svaki korak i pokazuje da rezultat odgovara korijenu.
+            Klikom na list (transakciju) klijent zatraži dokaz od poslužitelja, koji ga generira
+            iz cache-iranog cijelog stabla. Dokaz je <code>O(log n)</code> hash-eva — za blok od
+            4096 transakcija ~12 hash-eva (≈384 B). Klijent zatim <strong>sam ponovno izračuna</strong>{' '}
+            put prema gore koristeći Web Crypto (dvostruki SHA-256 nad binarnim parovima u
+            internom redoslijedu) i provjeri da rezultat odgovara navedenom korijenu — animacija
+            korak-po-korak vodi kroz tu provjeru.
           </p>
         </Section>
       </Card>
@@ -339,33 +396,37 @@ function BitcoinContent({ lang, t }) {
       <Section title={t('info.sections.limitations')}>
         <ul>
           <li>
-            <strong>Hashing simplification:</strong> the app uses <em>single</em> SHA-256 over
-            the <em>hex-string</em> concatenation of the two children. Real Bitcoin uses{' '}
-            <em>double</em> SHA-256 over the <em>byte-reversed binary</em> form. The root this
-            app produces will not byte-match the merkle root in the actual block header — the
-            structure and proof mechanics are identical, only the bytewise result differs.
+            <strong>Two hashing modes:</strong> when a real block is loaded by height or hash,
+            the app uses the <em>actual Bitcoin algorithm</em> —{' '}
+            <code>SHA-256(SHA-256(left_bin || right_bin))</code> over txids in their internal byte
+            order. The root the app displays byte-matches the merkle root in the block header
+            exactly. When the user supplies a custom transaction list, the app falls back to a{' '}
+            <em>didactic</em> variant — single SHA-256 over hex-string concatenation — because
+            user-typed input isn't real Bitcoin txids.
           </li>
           <li>
             Bitcoin's odd-leaf rule (duplicate the last hash if a level has an odd count) is
-            implemented exactly.
+            implemented exactly, in both modes.
           </li>
           <li>
             Render depth is capped at 4 levels; anything deeper loads on demand via{' '}
             <code>/expand-subtree</code>.
           </li>
           <li>
-            The server cache holds 16 most-recent blocks. After eviction, expansion requires
-            re-fetching the block.
+            The server cache holds 16 most-recent trees. After eviction, generating a proof
+            requires reloading the block.
           </li>
         </ul>
       </Section>
 
       <Section title={t('info.sections.proof')}>
         <p>
-          Clicking a leaf walks the tree from leaf to root, collecting one sibling per level.
-          The proof is <code>O(log n)</code> hashes — for a 4096-tx block that's ~12 hashes
-          (≈384 bytes). Verification rehashes upward; the animated panel replays each step and
-          shows the final value matching the root.
+          Clicking a leaf asks the server for an authoritative proof, which it generates from the
+          cached full tree. The proof is <code>O(log n)</code> hashes — for a 4096-tx block that's
+          ~12 hashes (≈384 bytes). The client then <strong>re-runs</strong> the hash chain itself
+          using Web Crypto (double SHA-256 over binary pairs in internal byte order) and confirms
+          the result matches the stated root — the animated panel walks step by step through that
+          verification.
         </p>
       </Section>
     </Card>
@@ -432,12 +493,14 @@ function GitContent({ lang, t }) {
 
         <Section title={t('info.sections.proof')}>
           <p>
-            "Dokaz" članstva datoteke u commitu je put blob → roditeljski tree → … → commit.
-            Sestrinski čvorovi su ostali unosi u svakom tree-u. Stvarna Git provjera kombinira
-            način + tip + ime + sha za svaki unos i hashira točno onako kako Git radi — to se
-            razlikuje od pojednostavljenog{' '}
-            <code>SHA-256(hexL + hexR)</code> u animaciji dokaza, pa je animacija ovdje
-            ilustrativna a ne bytewise vjerna.
+            Dokaz da blob pripada commitu sastoji se od: sadržaja commit objekta, lanca tree
+            objekata od roditelja blob-a do root tree-a (svaki s punom listom unosa), i sha
+            blob-a. Klijent <strong>sam</strong> rekonstruira binarnu serijalizaciju svakog
+            tree-a (<code>&lt;mode&gt; &lt;ime&gt;\0&lt;binarni hash&gt;</code>, sortirano po
+            git-ovom pravilu, prefiksirano sa <code>tree &lt;veličina&gt;\0</code>), izračuna
+            SHA-1 i provjeri da odgovara hash-u koji git navodi. Na kraju hashira commit objekt
+            i provjeri da referencira root tree. Ovaj dokaz je byte-for-byte vjeran git-ovom
+            internom formatu — animacija pokazuje stvarne hash-eve, ne ilustrativne.
           </p>
         </Section>
       </Card>
@@ -497,12 +560,14 @@ function GitContent({ lang, t }) {
 
       <Section title={t('info.sections.proof')}>
         <p>
-          A "proof" of file membership in a commit is the path blob → parent tree → … →
-          commit; the siblings are the other entries in each tree. Git's actual verification
-          hashes <code>mode + type + name + sha</code> for every entry exactly the way Git
-          does — that differs from the simplified{' '}
-          <code>SHA-256(hexL + hexR)</code> used by the proof animation, so the animation here
-          is illustrative rather than bytewise faithful.
+          A proof that a blob belongs to a commit is: the commit object's content, the chain of
+          tree objects from the blob's parent up to the root tree (each with its full entry
+          list), and the blob's sha. The client <strong>itself</strong> reconstructs each tree's
+          binary serialization (<code>&lt;mode&gt; &lt;name&gt;\0&lt;binary-hash&gt;</code>,
+          sorted by git's rule, prefixed with <code>tree &lt;size&gt;\0</code>), runs SHA-1, and
+          asserts the result matches the SHA git reports. Finally it hashes the commit object
+          and confirms it references the root tree. This proof is byte-for-byte faithful to
+          git's on-disk format — the animation shows real hashes, not illustrative ones.
         </p>
       </Section>
     </Card>

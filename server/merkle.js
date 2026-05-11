@@ -81,6 +81,35 @@ function generateMerkleProof(treeObj, leafValue) {
     return proof;
 }
 
+// Frontend-shaped proof: each step is {nodeHash, siblingHash, siblingPosition,
+// parentHash} so the visualizer can render the leaf-to-root chain directly.
+// Same correctness guarantees as generateMerkleProof — just packaged richer.
+function generateRichProof(treeObj, leafValue) {
+    const targetHash = sha256(leafValue);
+    const levels = treeObj.tree;
+    const leafLevel = levels[levels.length - 1];
+    let index = leafLevel.findIndex(node => node.hash === targetHash);
+    if (index === -1) throw new Error('Leaf not found in tree.');
+
+    const steps = [];
+    for (let i = levels.length - 1; i > 0; i--) {
+        const level = levels[i];
+        const parentLevel = levels[i - 1];
+        const isRight = index % 2 === 1;
+        const siblingIndex = isRight ? index - 1 : index + 1;
+        const sibling = siblingIndex < level.length ? level[siblingIndex] : level[index];
+        const parentIndex = Math.floor(index / 2);
+        steps.push({
+            nodeHash: level[index].hash,
+            siblingHash: sibling.hash,
+            siblingPosition: isRight ? 'left' : 'right',
+            parentHash: parentLevel[parentIndex].hash,
+        });
+        index = parentIndex;
+    }
+    return { leafHash: targetHash, steps };
+}
+
 // Verifikacija Merkle dokaza
 function verifyMerkleProof(leafValue, proof, rootHash) {
     let computedHash = sha256(leafValue);
@@ -138,6 +167,7 @@ function findSubtreeByHash(node, hash) {
 module.exports = {
     createMerkleTree,
     generateMerkleProof,
+    generateRichProof,
     verifyMerkleProof,
     transformTree,
     findSubtreeByHash

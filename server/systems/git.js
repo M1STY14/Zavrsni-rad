@@ -5,12 +5,52 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const crypto = require('crypto');
+const { generateGitProof } = require('./git-proof.js');
 
 // Limits
 const MAX_ENTRIES_PER_DIR = 12;
 const MAX_DEPTH = 4;
 const CLONE_DIR = path.join(os.tmpdir(), 'merkle-git-clones');
 const CLONE_TIMEOUT = 60000; // 60s for clone operations
+const MAX_CLONE_DIR_SIZE = 5 * 1024 * 1024 * 1024; // 5 GB total cache budget
+
+function dirSize(dir) {
+    let total = 0;
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) total += dirSize(full);
+        else if (entry.isFile()) total += fs.statSync(full).size;
+    }
+    return total;
+}
+
+// Evict oldest clone directories (by mtime) until total size is under the cap.
+// Called before each fresh clone; cache hits bump mtime so popular repos stay.
+function evictIfNeeded() {
+    if (!fs.existsSync(CLONE_DIR)) return;
+
+    const entries = fs.readdirSync(CLONE_DIR, { withFileTypes: true })
+        .filter(e => e.isDirectory())
+        .map(e => {
+            const full = path.join(CLONE_DIR, e.name);
+            return { full, mtime: fs.statSync(full).mtimeMs, size: dirSize(full) };
+        });
+
+    let total = entries.reduce((s, e) => s + e.size, 0);
+    if (total <= MAX_CLONE_DIR_SIZE) return;
+
+    entries.sort((a, b) => a.mtime - b.mtime);
+    for (const entry of entries) {
+        if (total <= MAX_CLONE_DIR_SIZE) break;
+        try {
+            fs.rmSync(entry.full, { recursive: true, force: true });
+            total -= entry.size;
+            console.log(`[git] evicted ${path.basename(entry.full)} (${(entry.size / 1024 / 1024).toFixed(0)} MB)`);
+        } catch (err) {
+            console.error(`[git] eviction failed for ${entry.full}: ${err.message}`);
+        }
+    }
+}
 
 // --- Helpers ---
 
@@ -41,11 +81,15 @@ function cloneUrl(url) {
         } catch {
             // fetch failed, still use stale clone
         }
+        // Bump mtime so eviction sees this clone as recently used.
+        const now = new Date();
+        fs.utimesSync(cloneDir, now, now);
         return cloneDir;
     }
 
     // Fresh blobless clone — we only need tree/commit objects, not file contents
     fs.mkdirSync(CLONE_DIR, { recursive: true });
+    evictIfNeeded();
     execSync(`git clone --filter=blob:none --no-checkout --single-branch ${JSON.stringify(url)} ${JSON.stringify(cloneDir)}`, {
         timeout: CLONE_TIMEOUT,
         encoding: 'utf-8',
@@ -119,7 +163,7 @@ function readTreeEntries(repoPath, treeSha) {
     }).filter(Boolean);
 }
 
-function buildGitTree(repoPath, treeSha, dirName, depth = 0) {
+function buildGitTree(repoPath, treeSha, dirName, depth = 0, prefix = '') {
     if (depth >= MAX_DEPTH) {
         return { name: treeSha, value: dirName + '/ (max depth)', children: [] };
     }
@@ -138,12 +182,15 @@ function buildGitTree(repoPath, treeSha, dirName, depth = 0) {
     for (let i = 0; i < limit; i++) {
         const entry = entries[i];
         if (entry.type === 'tree') {
-            children.push(buildGitTree(repoPath, entry.hash, entry.name, depth + 1));
+            const childPrefix = prefix ? `${prefix}/${entry.name}` : entry.name;
+            children.push(buildGitTree(repoPath, entry.hash, entry.name, depth + 1, childPrefix));
         } else {
-            // Blob leaf — path-qualified name for uniqueness
+            // Blob leaf — path-qualified name for uniqueness, full path for proof generation.
+            const fullPath = prefix ? `${prefix}/${entry.name}` : entry.name;
             children.push({
                 name: `${entry.hash}/${entry.name}`,
                 value: entry.name,
+                path: fullPath,
             });
         }
     }
@@ -379,6 +426,29 @@ router.get('/commit/:sha/adjacent', (req, res) => {
                 side: 'left',
             }],
         });
+    }
+});
+
+// POST /proof — server-authoritative proof that a blob is part of a commit's
+// tree DAG. Returns the git-tree envelope (commit content + tree chain with
+// entries) so the client can re-hash each tree using git's actual format and
+// verify the chain bottom-up.
+router.post('/proof', (req, res) => {
+    try {
+        const { repoPath: rawRepoPath, commitRef, blobPath } = req.body || {};
+        if (!commitRef || !blobPath) {
+            return res.status(400).json({ error: 'commitRef and blobPath are required.' });
+        }
+
+        const repoPath = rawRepoPath && rawRepoPath.trim() !== '' ? rawRepoPath : '.';
+        const absPath = resolveRepoPath(repoPath);
+        const commitSha = resolveRef(absPath, commitRef);
+
+        const proof = generateGitProof(absPath, commitSha, blobPath);
+        res.json(proof);
+    } catch (err) {
+        console.log(`Git proof error: ${err.message}`);
+        res.status(400).json({ error: err.message });
     }
 });
 

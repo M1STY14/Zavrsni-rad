@@ -1,11 +1,31 @@
 const express = require('express');
 const router = express.Router();
-const { createMerkleTree, transformTree } = require('../merkle.js');
+const { createMerkleTree, transformTree, generateRichProof } = require('../merkle.js');
 
 // Limits
 const MAX_DOWNLOAD_SIZE = 10 * 1024 * 1024; // 10 MB max .torrent file
 const MAX_PIECES = 64;                       // Max pieces to visualize
 const DOWNLOAD_TIMEOUT = 15000;              // 15s download timeout
+
+// LRU cache of full Merkle trees keyed by rootHash so /proof can rebuild
+// proofs without re-downloading the torrent. Same pattern as bitcoin.js.
+const TREE_CACHE_SIZE = 16;
+const treeCache = new Map();
+function cacheGet(key) {
+    if (!treeCache.has(key)) return null;
+    const value = treeCache.get(key);
+    treeCache.delete(key);
+    treeCache.set(key, value);
+    return value;
+}
+function cacheSet(key, value) {
+    if (treeCache.has(key)) treeCache.delete(key);
+    treeCache.set(key, value);
+    while (treeCache.size > TREE_CACHE_SIZE) {
+        const oldest = treeCache.keys().next().value;
+        treeCache.delete(oldest);
+    }
+}
 
 // --- Minimal bencode decoder ---
 // Bencode format: strings="len:data", ints="iNe", lists="l...e", dicts="d...e"
@@ -239,6 +259,7 @@ function buildTreeResponse(torrentData) {
         : pieceHashes;
 
     const tree = createMerkleTree(displayHashes);
+    cacheSet(tree.root.hash, tree);
 
     return {
         tree: transformTree(tree.root),
@@ -282,6 +303,38 @@ router.post('/tree', async (req, res) => {
             error: err.message,
             availableDemos: DEMO_LIST,
         });
+    }
+});
+
+// POST /proof — server-authoritative Merkle proof for a cached torrent tree.
+// Body: { rootHash, pieceHash } where pieceHash is the 40-char SHA-1 hex of the
+// target piece (i.e. the leaf value).
+router.post('/proof', (req, res) => {
+    try {
+        const { rootHash, pieceHash } = req.body || {};
+        if (!rootHash || !pieceHash) {
+            return res.status(400).json({ error: 'rootHash and pieceHash are required.' });
+        }
+
+        const cached = cacheGet(rootHash);
+        if (!cached) {
+            return res.status(410).json({ error: 'Tree no longer cached — please reload the torrent.' });
+        }
+
+        const { leafHash, steps } = generateRichProof(cached, pieceHash);
+
+        res.json({
+            kind: 'binary-merkle',
+            rootHash,
+            leaf: { value: pieceHash, hash: leafHash },
+            steps,
+        });
+    } catch (err) {
+        if (err.message === 'Leaf not found in tree.') {
+            return res.status(404).json({ error: `Piece '${req.body?.pieceHash}' not found in this tree.` });
+        }
+        console.error('Error in proof:', err);
+        res.status(500).json({ error: 'Error generating proof: ' + err.message });
     }
 });
 

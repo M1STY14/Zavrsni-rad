@@ -1,72 +1,7 @@
-// Client-side Merkle tree utilities for proof path computation
-// These work on the tree structure returned from the server: { name: hash, children: [...], value?: string }
-
-/**
- * Find the proof path from a target node to the root.
- * Returns the set of hashes on the path, sibling hashes, and detailed steps.
- */
-export function findProofPath(tree, targetHash) {
-    const pathHashes = new Set();
-    const siblingHashes = new Set();
-    const steps = [];
-
-    function search(node, depth) {
-        if (!node) return false;
-
-        if (node.name === targetHash) {
-            pathHashes.add(node.name);
-            return true;
-        }
-
-        if (node.children && node.children.length > 0) {
-            for (let i = 0; i < node.children.length; i++) {
-                if (search(node.children[i], depth + 1)) {
-                    pathHashes.add(node.name);
-
-                    for (let j = 0; j < node.children.length; j++) {
-                        if (i !== j) {
-                            siblingHashes.add(node.children[j].name);
-                            steps.push({
-                                level: depth,
-                                nodeHash: node.children[i].name,
-                                siblingHash: node.children[j].name,
-                                siblingPosition: j < i ? 'left' : 'right',
-                                parentHash: node.name,
-                            });
-                        }
-                    }
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    search(tree, 0);
-
-    // Steps are already in leaf-to-root order (recursion unwinds bottom-up)
-    return { pathHashes, siblingHashes, steps };
-}
-
-/**
- * Check if a node hash corresponds to a leaf node in the tree.
- */
-export function isLeafNode(tree, hash) {
-    function search(node) {
-        if (!node) return false;
-        if (node.name === hash) {
-            return !node.children || node.children.length === 0;
-        }
-        if (node.children) {
-            for (const child of node.children) {
-                const result = search(child);
-                if (result !== false) return result;
-            }
-        }
-        return false;
-    }
-    return search(tree);
-}
+// Client-side tree-walking utilities. Proof generation lives on the server
+// and is verified by Web Crypto in src/utils/proof-verifier.js — this file
+// only navigates the displayed tree structure: { name: hash, children?: [...],
+// value?: string, path?: string }.
 
 /**
  * Get all leaf nodes from the tree.
