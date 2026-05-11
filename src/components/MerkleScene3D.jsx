@@ -4,99 +4,7 @@ import { OrbitControls, Text, Stars } from '@react-three/drei';
 import { useSpring, animated } from '@react-spring/three';
 import * as THREE from 'three';
 import { getTreeDepth, getTreeStats } from '../utils/merkle';
-
-// Demo tree data - 5 levels with 16 leaves (exported for proof calculation)
-export const DEMO_TREE = {
-  name: "root_a7f3c892",
-  children: [
-    {
-      name: "lvl1_5b8e1a2f",
-      children: [
-        {
-          name: "lvl2_e3c1a9f0",
-          children: [
-            {
-              name: "lvl3_1a2b3c4d",
-              children: [
-                { name: "leaf_01abc123" },
-                { name: "leaf_02def456" }
-              ]
-            },
-            {
-              name: "lvl3_2e3f4a5b",
-              children: [
-                { name: "leaf_03ghi789" },
-                { name: "leaf_04jkl012" }
-              ]
-            }
-          ]
-        },
-        {
-          name: "lvl2_7b125f3c",
-          children: [
-            {
-              name: "lvl3_3c4d5e6f",
-              children: [
-                { name: "leaf_05mno345" },
-                { name: "leaf_06pqr678" }
-              ]
-            },
-            {
-              name: "lvl3_4f5a6b7c",
-              children: [
-                { name: "leaf_07stu901" },
-                { name: "leaf_08vwx234" }
-              ]
-            }
-          ]
-        }
-      ]
-    },
-    {
-      name: "lvl1_9c2d4f1a",
-      children: [
-        {
-          name: "lvl2_a4d1bb99",
-          children: [
-            {
-              name: "lvl3_5d6e7f8a",
-              children: [
-                { name: "leaf_09yza567" },
-                { name: "leaf_10bcd890" }
-              ]
-            },
-            {
-              name: "lvl3_6e7f8a9b",
-              children: [
-                { name: "leaf_11efg123" },
-                { name: "leaf_12hij456" }
-              ]
-            }
-          ]
-        },
-        {
-          name: "lvl2_0c5423d1",
-          children: [
-            {
-              name: "lvl3_7f8a9b0c",
-              children: [
-                { name: "leaf_13klm789" },
-                { name: "leaf_14nop012" }
-              ]
-            },
-            {
-              name: "lvl3_8a9b0c1d",
-              children: [
-                { name: "leaf_15qrs345" },
-                { name: "leaf_16tuv678" }
-              ]
-            }
-          ]
-        }
-      ]
-    }
-  ]
-};
+import { DEMO_TREE } from '../data/demo.js';
 
 // Reveal animation timing (ms per depth level)
 const REVEAL_MS_PER_LEVEL = 650;
@@ -1002,7 +910,7 @@ function Scene({ phase, treeData, proofHighlight, onNodeClick, onExpandCollapsed
         {nodePositions.map((nodeData) => {
           const isCollapsed = nodeData.node?.collapsed === true;
           const leafCount = nodeData.node?.leafCount;
-          const isExpanding = expandingHashes?.has(nodeData.hash);
+          const isExpanding = !!expandingHashes?.[nodeData.hash];
           return isInteractive ? (
             <ExploringTreeNode
               key={nodeData.hash}

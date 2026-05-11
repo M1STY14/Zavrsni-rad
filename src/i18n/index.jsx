@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import en from './en.js';
-import hr from './hr.js';
+import en from './en.jsx';
+import hr from './hr.jsx';
 
 const DICTS = { en, hr };
 const STORAGE_KEY = 'merkle.lang';

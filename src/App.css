@@ -901,6 +901,49 @@ select.floating-input-field option {
 }
 
 /* ======================== */
+/* Truncation banner        */
+/* ======================== */
+.truncation-banner {
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.6rem 1.1rem;
+  border-radius: 0.5rem;
+  background: rgba(20, 20, 20, 0.92);
+  color: #eee;
+  font-size: 0.88rem;
+  max-width: min(640px, calc(100vw - 2rem));
+  text-align: center;
+  border: 1px solid rgba(247, 147, 26, 0.4);
+  backdrop-filter: blur(8px);
+  z-index: 30;
+  pointer-events: none;
+}
+
+/* ======================== */
+/* Click hint toast         */
+/* ======================== */
+.click-hint-toast {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.65rem 1.1rem;
+  border-radius: 0.5rem;
+  background: rgba(20, 20, 20, 0.94);
+  color: #eee;
+  font-size: 0.9rem;
+  max-width: min(560px, calc(100vw - 2rem));
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+  z-index: 40;
+  pointer-events: none;
+}
+
+/* ======================== */
 /* Proof Panel (Floating)   */
 /* ======================== */
 .proof-panel-floating {

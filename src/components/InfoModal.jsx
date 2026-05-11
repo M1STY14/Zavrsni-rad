@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { useLang, useT } from '../i18n/index.jsx';
+import { useT } from '../i18n/index.jsx';
+import Card from './info/Card.jsx';
+import Section from './info/Section.jsx';
 
 const SYSTEM_COLORS = {
   general: '#00d4ff',
@@ -8,25 +10,20 @@ const SYSTEM_COLORS = {
   bittorrent: '#58d033',
 };
 
+const TABS = ['general', 'bitcoin', 'git', 'bittorrent'];
+
 export default function InfoModal({ open, onClose, phase, activeSystemId }) {
-  const { lang } = useLang();
   const t = useT();
   const [tab, setTab] = useState('general');
 
-  // When the modal opens, default the tab to the active system
-  // (general while landing).
+  // When the modal opens, default the tab to the active system (general while
+  // landing).
   useEffect(() => {
     if (!open) return;
-    if (phase === 'exploring' && activeSystemId) {
-      setTab(activeSystemId);
-    } else {
-      setTab('general');
-    }
+    setTab(phase === 'exploring' && activeSystemId ? activeSystemId : 'general');
   }, [open, phase, activeSystemId]);
 
   if (!open) return null;
-
-  const tabs = ['general', 'bitcoin', 'git', 'bittorrent'];
 
   return (
     <div className="info-modal-backdrop" onClick={onClose}>
@@ -44,7 +41,7 @@ export default function InfoModal({ open, onClose, phase, activeSystemId }) {
         </div>
 
         <div className="info-modal-tabs" role="tablist">
-          {tabs.map((id) => (
+          {TABS.map((id) => (
             <button
               key={id}
               role="tab"
@@ -67,7 +64,10 @@ export default function InfoModal({ open, onClose, phase, activeSystemId }) {
         </div>
 
         <div className="info-modal-body">
-          <TabContent tab={tab} lang={lang} t={t} />
+          {tab === 'general' && <GeneralTab t={t} />}
+          {tab === 'bitcoin' && <SystemTab t={t} system="bitcoin" accent="#f7931a" title="Bitcoin" />}
+          {tab === 'git' && <SystemTab t={t} system="git" accent="#9b7fc6" title="Git" />}
+          {tab === 'bittorrent' && <SystemTab t={t} system="bittorrent" accent="#58d033" title="BitTorrent" />}
 
           <a
             href="https://github.com/"
@@ -88,640 +88,34 @@ export default function InfoModal({ open, onClose, phase, activeSystemId }) {
   );
 }
 
-function TabContent({ tab, lang, t }) {
-  if (tab === 'general') return <GeneralContent lang={lang} t={t} />;
-  if (tab === 'bitcoin') return <BitcoinContent lang={lang} t={t} />;
-  if (tab === 'git') return <GitContent lang={lang} t={t} />;
-  if (tab === 'bittorrent') return <BittorrentContent lang={lang} t={t} />;
-  return null;
-}
-
-function Card({ accent, title, children }) {
-  return (
-    <div className="info-card" style={accent ? { borderColor: `${accent}40` } : undefined}>
-      <h3
-        style={{
-          color: accent || '#00d4ff',
-          fontSize: '1.25rem',
-          marginBottom: '0.7rem',
-        }}
-      >
-        {title}
-      </h3>
-      {children}
-    </div>
-  );
-}
-
-function Section({ title, children }) {
-  return (
-    <div className="info-section">
-      <h4>{title}</h4>
-      {children}
-    </div>
-  );
-}
-
-// ------- GENERAL TAB -------
-
-function GeneralContent({ lang, t }) {
-  if (lang === 'hr') {
-    return (
-      <>
-        <Card accent="#00d4ff" title="Što je Merkle stablo?">
-          <p>
-            Merkle stablo je binarno stablo izgrađeno preko skupa podataka tako da se svaki list
-            zamijeni hashom dijela podataka, a svaki unutarnji čvor hashom konkatenacije svoja
-            dva djeteta. Promjena bilo kojeg jedinog bita u izvornim podacima propagira se sve do
-            korijena, pa jedan hash <em>commitira</em> integritet cijelog skupa.
-          </p>
-          <p style={{ marginTop: '0.6rem' }}>
-            Glavna korist: dokaz da je određeni list u stablu zahtijeva samo <code>log₂(n)</code>{' '}
-            hashova (sestrinske čvorove uz put do korijena), neovisno koliko je velik skup
-            podataka. To omogućuje takozvani <strong>SPV</strong> stil verifikacije —
-            laki klijenti provjeravaju članstvo bez preuzimanja cijelog skupa.
-          </p>
-        </Card>
-
-        <Card accent="#667eea" title="Što ova aplikacija radi?">
-          <p>
-            Aplikacija dohvaća stvarne podatke iz tri sustava (Bitcoin, Git, BitTorrent), gradi
-            odgovarajuće Merkle stablo i prikazuje ga kao 3D fraktalnu strukturu pomoću Three.js.
-            Klikom na list pokreće se animirani Merkle dokaz: aplikacija označava put od lista do
-            korijena, prikazuje sestrinske hashove na svakoj razini i ponovno hashira korak po
-            korak kako bi pokazala da rezultat odgovara korijenu.
-          </p>
-        </Card>
-
-        <Card accent="#f7931a" title="Tri sustava">
-          <ul className="info-apps-list" style={{ marginTop: 0 }}>
-            <li style={{ background: 'rgba(247, 147, 26, 0.1)', borderLeftColor: '#f7931a' }}>
-              <strong style={{ color: '#f7931a' }}>Bitcoin:</strong> Merkle korijen u zaglavlju
-              bloka commitira sve transakcije bloka.
-            </li>
-            <li style={{ background: 'rgba(110, 84, 148, 0.1)', borderLeftColor: '#6e5494' }}>
-              <strong style={{ color: '#6e5494' }}>Git:</strong> commit → tree → blob već je
-              Merkle DAG; svaki SHA-1 commitira cjelokupno stablo direktorija.
-            </li>
-            <li style={{ background: 'rgba(88, 208, 51, 0.1)', borderLeftColor: '#58d033' }}>
-              <strong style={{ color: '#58d033' }}>BitTorrent:</strong> hashovi komada
-              osiguravaju integritet datoteka tijekom prijenosa peer-to-peer.
-            </li>
-          </ul>
-          <p style={{ marginTop: '0.6rem', fontSize: '0.85rem', opacity: 0.7 }}>
-            Otvori karticu pojedinog sustava da vidiš točan tok podataka i ograničenja.
-          </p>
-        </Card>
-
-        <Card accent="#9b7fc6" title="Merkle stablo nasuprot Merkle DAG-u">
-          <p>
-            Iako sva tri sustava posjeduju "Merkle svojstvo" (promjena na bilo kojem listu mijenja
-            korijen), <strong>strukture nisu iste</strong> — i to mijenja oblik dokaza.
-          </p>
-          <p style={{ marginTop: '0.6rem' }}>
-            <strong>Bitcoin i BitTorrent</strong> grade <em>klasično binarno Merkle stablo</em>{' '}
-            iznad ravne liste vrijednosti (txid-ovi, hashovi komada). Svaki unutarnji čvor ima
-            točno dva djeteta; roditelj se računa kao <code>hash(lijevi || desni)</code>. Dokaz je{' '}
-            <code>O(log n)</code> hash-eva — samo bratski hash na svakoj razini puta od lista do
-            korijena.
-          </p>
-          <p style={{ marginTop: '0.6rem' }}>
-            <strong>Git</strong> nije binarno stablo, već <em>Merkle DAG tipiziranih objekata</em>:
-            tree objekti (popisi direktorija) povezuju blob objekte (sadržaj datoteka). Hash tree
-            objekta računa se nad <em>cijelom serijaliziranom listom unosa</em> (mode, ime, dijete
-            sha) — ne nad parovima. Zato dokaz da blob pripada commitu mora prikazati{' '}
-            <em>cijelu listu unosa</em> svakog tree-a na putu, ne samo bratski hash. To je{' '}
-            <code>O(dubina × stupanj)</code> bajtova, ali dokazuje i točan put datoteke u repozitoriju.
-          </p>
-          <p style={{ marginTop: '0.6rem' }}>
-            Vizualizacija pokušava jezgrovito prikazati ovu razliku: Bitcoin/BitTorrent kartica
-            pokazuje par-i-hashiraj, Git kartica pokazuje rekonstrukciju cijelog tree objekta i
-            usporedbu izračunatog SHA-1 sa onim koji git navodi.
-          </p>
-        </Card>
-      </>
-    );
-  }
-
+// General tab — four cards explaining what a Merkle tree is, what the app does,
+// the three systems, and how a binary Merkle tree differs from a Merkle DAG.
+function GeneralTab({ t }) {
+  const cards = [
+    { accent: '#00d4ff', title: t('info.general.what_is_merkle_title'), body: t('info.general.what_is_merkle') },
+    { accent: '#667eea', title: t('info.general.what_app_does_title'), body: t('info.general.what_app_does') },
+    { accent: '#f7931a', title: t('info.general.three_systems_title'), body: t('info.general.three_systems') },
+    { accent: '#9b7fc6', title: t('info.general.tree_vs_dag_title'), body: t('info.general.tree_vs_dag') },
+  ];
   return (
     <>
-      <Card accent="#00d4ff" title="What is a Merkle tree?">
-        <p>
-          A Merkle tree is a binary tree built over a dataset by hashing each leaf's data
-          and recursively hashing the concatenation of every two children. A single bit change
-          anywhere in the input propagates to the root, so one hash <em>commits to</em> the
-          integrity of the entire dataset.
-        </p>
-        <p style={{ marginTop: '0.6rem' }}>
-          The headline benefit: proving that a specific leaf is in the tree only requires
-          <code> log₂(n) </code>
-          sibling hashes along the path to the root, regardless of dataset size. This is what
-          enables <strong>SPV-style</strong> verification — light clients check membership
-          without downloading the whole dataset.
-        </p>
-      </Card>
-
-      <Card accent="#667eea" title="What does this app do?">
-        <p>
-          The app pulls real data from three systems (Bitcoin, Git, BitTorrent), builds the
-          corresponding Merkle tree, and renders it as a 3D fractal structure via Three.js.
-          Clicking a leaf triggers an animated Merkle proof: the path from the leaf to the
-          root is highlighted, the sibling hashes used at each level are surfaced, and the
-          rehash is replayed step by step until it matches the root.
-        </p>
-      </Card>
-
-      <Card accent="#f7931a" title="The three systems">
-        <ul className="info-apps-list" style={{ marginTop: 0 }}>
-          <li style={{ background: 'rgba(247, 147, 26, 0.1)', borderLeftColor: '#f7931a' }}>
-            <strong style={{ color: '#f7931a' }}>Bitcoin:</strong> the Merkle root in the block
-            header commits to every transaction in the block.
-          </li>
-          <li style={{ background: 'rgba(110, 84, 148, 0.1)', borderLeftColor: '#6e5494' }}>
-            <strong style={{ color: '#6e5494' }}>Git:</strong> commit → tree → blob is already
-            a Merkle DAG; every SHA-1 commits to the entire directory state below it.
-          </li>
-          <li style={{ background: 'rgba(88, 208, 51, 0.1)', borderLeftColor: '#58d033' }}>
-            <strong style={{ color: '#58d033' }}>BitTorrent:</strong> piece hashes guarantee
-            integrity of files as they arrive over a peer-to-peer swarm.
-          </li>
-        </ul>
-        <p style={{ marginTop: '0.6rem', fontSize: '0.85rem', opacity: 0.7 }}>
-          Open a system tab to see the exact data flow and limitations.
-        </p>
-      </Card>
-
-      <Card accent="#9b7fc6" title="Merkle tree vs. Merkle DAG">
-        <p>
-          All three systems share the Merkle property (changing any leaf changes the root), but{' '}
-          <strong>the structures are not the same</strong> — and that changes the proof shape.
-        </p>
-        <p style={{ marginTop: '0.6rem' }}>
-          <strong>Bitcoin and BitTorrent</strong> build a <em>classic binary Merkle tree</em>{' '}
-          over a flat list of values (txids, piece hashes). Every internal node has exactly two
-          children; the parent is computed as <code>hash(left || right)</code>. The proof is{' '}
-          <code>O(log n)</code> hashes — one sibling per level on the leaf-to-root path.
-        </p>
-        <p style={{ marginTop: '0.6rem' }}>
-          <strong>Git</strong> is not a binary tree but a <em>Merkle DAG of typed objects</em>:
-          tree objects (directory listings) link to blob objects (file contents). A tree's hash
-          is computed over the <em>entire serialized entry list</em> (mode, name, child sha) —
-          not over pairs. So a proof that a blob belongs to a commit must reveal{' '}
-          <em>the full entry list</em> of every tree on the path, not just sibling hashes. That's{' '}
-          <code>O(depth × fanout)</code> bytes, but it also proves the file's exact path in the
-          repository.
-        </p>
-        <p style={{ marginTop: '0.6rem' }}>
-          The visualization tries to make the contrast tangible: the Bitcoin / BitTorrent panels
-          show pair-and-hash steps, while the Git panel shows full tree-object reconstruction
-          with the recomputed SHA-1 compared against the one git reports.
-        </p>
-      </Card>
+      {cards.map((c, i) => (
+        <Card key={i} accent={c.accent} title={c.title}>{c.body}</Card>
+      ))}
     </>
   );
 }
 
-// ------- BITCOIN TAB -------
-
-function BitcoinContent({ lang, t }) {
-  const accent = '#f7931a';
-  if (lang === 'hr') {
-    return (
-      <Card accent={accent} title="Bitcoin">
-        <Section title={t('info.sections.overview')}>
-          <p>
-            Bitcoin blok sadrži uređenu listu transakcija. Zaglavlje bloka uključuje{' '}
-            <strong>Merkle korijen</strong> svih txid-ova — jedan hash koji commitira na cijeli
-            sadržaj bloka. Svatko s tim korijenom i kratkim dokazom može provjeriti da je
-            određena transakcija u bloku, bez preuzimanja ostalih (mehanizam{' '}
-            <em>Simplified Payment Verification</em>, SPV).
-          </p>
-        </Section>
-
-        <Section title={t('info.sections.dataflow')}>
-          <ul>
-            <li>Frontend šalje visinu ili hash bloka prema <code>/api/bitcoin/...</code>.</li>
-            <li>
-              Poslužitelj poziva <code>mempool.space/api/block/&lt;hash&gt;/txids</code> za listu
-              txid-ova.
-            </li>
-            <li>
-              Listovi se hashiraju, a roditelji se grade po pravilu{' '}
-              <code>SHA-256(hexL + hexR)</code> dok se ne dobije korijen.
-            </li>
-            <li>
-              Cijelo stablo se cache-ira u memoriji (LRU, 16 unosa). Klijentu se šalju samo
-              gornje 4 razine; dublji podstablovi su <em>collapsed</em> placeholderi s brojem
-              transakcija.
-            </li>
-            <li>
-              Klikom na collapsed čvor poziva se <code>/expand-subtree</code>, koji vraća
-              sljedeće 4 razine iz cache-a.
-            </li>
-          </ul>
-        </Section>
-
-        <Section title={t('info.sections.limitations')}>
-          <ul>
-            <li>
-              <strong>Dva načina hashiranja:</strong> kada se učita stvarni blok preko visine ili
-              hash-a, aplikacija koristi <em>stvaran Bitcoin algoritam</em> —{' '}
-              <code>SHA-256(SHA-256(left_bin || right_bin))</code> nad txid-ovima u internom
-              redoslijedu bajtova. Korijen koji se prikaže odgovara byte-for-byte onome u zaglavlju
-              bloka. Kada korisnik upiše vlastitu listu transakcija, koristi se <em>didaktička</em>{' '}
-              varijanta — jednostruki SHA-256 nad hex konkatenacijom — jer korisnički unos nisu
-              stvarni txid-ovi.
-            </li>
-            <li>
-              Pravilo dupliciranja zadnjeg lista za neparan broj listova je implementirano kao
-              kod stvarnog Bitcoina, u oba načina.
-            </li>
-            <li>Render je ograničen na 4 razine; sve dublje učitava se na klik.</li>
-            <li>
-              Cache podržava 16 najnovijih blokova. Nakon evikcije, dokaz zahtijeva ponovno
-              učitavanje bloka.
-            </li>
-          </ul>
-        </Section>
-
-        <Section title={t('info.sections.proof')}>
-          <p>
-            Klikom na list (transakciju) klijent zatraži dokaz od poslužitelja, koji ga generira
-            iz cache-iranog cijelog stabla. Dokaz je <code>O(log n)</code> hash-eva — za blok od
-            4096 transakcija ~12 hash-eva (≈384 B). Klijent zatim <strong>sam ponovno izračuna</strong>{' '}
-            put prema gore koristeći Web Crypto (dvostruki SHA-256 nad binarnim parovima u
-            internom redoslijedu) i provjeri da rezultat odgovara navedenom korijenu — animacija
-            korak-po-korak vodi kroz tu provjeru.
-          </p>
-        </Section>
-      </Card>
-    );
-  }
-
+// System tab — one card with four standard sections sourced from the dict.
+function SystemTab({ t, system, accent, title }) {
+  const sections = ['overview', 'dataflow', 'limitations', 'proof'];
   return (
-    <Card accent={accent} title="Bitcoin">
-      <Section title={t('info.sections.overview')}>
-        <p>
-          A Bitcoin block contains an ordered list of transactions. The block header includes a{' '}
-          <strong>Merkle root</strong> of every txid — a single hash that commits to the block's
-          contents. Anyone holding the root and a short proof can verify a single transaction is
-          in the block without downloading the rest (this is what powers <em>Simplified Payment
-          Verification</em>, SPV).
-        </p>
-      </Section>
-
-      <Section title={t('info.sections.dataflow')}>
-        <ul>
-          <li>Frontend posts a block height or hash to <code>/api/bitcoin/...</code>.</li>
-          <li>
-            Server calls <code>mempool.space/api/block/&lt;hash&gt;/txids</code> to fetch the
-            ordered txid list.
-          </li>
-          <li>
-            Leaves are hashed, then parents are built with{' '}
-            <code>SHA-256(hexL + hexR)</code> all the way to the root.
-          </li>
-          <li>
-            The full tree is cached in memory (LRU, 16 entries). Only the top 4 levels are
-            shipped to the client; deeper subtrees become <em>collapsed</em> placeholders
-            tagged with their leaf count.
-          </li>
-          <li>
-            Clicking a collapsed placeholder hits <code>/expand-subtree</code>, which returns
-            the next 4 levels from the cached tree.
-          </li>
-        </ul>
-      </Section>
-
-      <Section title={t('info.sections.limitations')}>
-        <ul>
-          <li>
-            <strong>Two hashing modes:</strong> when a real block is loaded by height or hash,
-            the app uses the <em>actual Bitcoin algorithm</em> —{' '}
-            <code>SHA-256(SHA-256(left_bin || right_bin))</code> over txids in their internal byte
-            order. The root the app displays byte-matches the merkle root in the block header
-            exactly. When the user supplies a custom transaction list, the app falls back to a{' '}
-            <em>didactic</em> variant — single SHA-256 over hex-string concatenation — because
-            user-typed input isn't real Bitcoin txids.
-          </li>
-          <li>
-            Bitcoin's odd-leaf rule (duplicate the last hash if a level has an odd count) is
-            implemented exactly, in both modes.
-          </li>
-          <li>
-            Render depth is capped at 4 levels; anything deeper loads on demand via{' '}
-            <code>/expand-subtree</code>.
-          </li>
-          <li>
-            The server cache holds 16 most-recent trees. After eviction, generating a proof
-            requires reloading the block.
-          </li>
-        </ul>
-      </Section>
-
-      <Section title={t('info.sections.proof')}>
-        <p>
-          Clicking a leaf asks the server for an authoritative proof, which it generates from the
-          cached full tree. The proof is <code>O(log n)</code> hashes — for a 4096-tx block that's
-          ~12 hashes (≈384 bytes). The client then <strong>re-runs</strong> the hash chain itself
-          using Web Crypto (double SHA-256 over binary pairs in internal byte order) and confirms
-          the result matches the stated root — the animated panel walks step by step through that
-          verification.
-        </p>
-      </Section>
-    </Card>
-  );
-}
-
-// ------- GIT TAB -------
-
-function GitContent({ lang, t }) {
-  const accent = '#9b7fc6';
-  if (lang === 'hr') {
-    return (
-      <Card accent={accent} title="Git">
-        <Section title={t('info.sections.overview')}>
-          <p>
-            Git repozitorij je već <strong>Merkle DAG</strong>. Svaki commit referencira tree
-            (root direktorij), svaki tree referencira blobove (sadržaj datoteka) i poddirektorije.
-            Sve reference su preko SHA-1 hashova; promjena jednog bajta u bilo kojem blobu
-            mijenja SHA-1 svakog roditelja sve do commita. To je upravo Merkle svojstvo.
-          </p>
+    <Card accent={accent} title={title}>
+      {sections.map((s) => (
+        <Section key={s} title={t(`info.sections.${s}`)}>
+          {t(`info.${system}.${s}`)}
         </Section>
-
-        <Section title={t('info.sections.dataflow')}>
-          <ul>
-            <li>
-              Korisnik unese GitHub URL ili lokalnu putanju (ili ostavi prazno za demo).
-            </li>
-            <li>
-              URL → <code>git clone --filter=blob:none --no-checkout</code> u privremeni
-              direktorij. <em>Blobless</em> klon dohvaća samo commit/tree objekte, ne i sadržaj
-              datoteka. Klonovi se ponovno koriste.
-            </li>
-            <li>
-              Lokalna putanja → poslužitelj validira pomoću <code>git rev-parse --git-dir</code>.
-            </li>
-            <li>
-              <code>git cat-file -p &lt;commit&gt;</code> daje SHA tree-a, roditelje i poruku;{' '}
-              <code>git ls-tree</code> rekurzivno prolazi hijerarhiju.
-            </li>
-            <li>
-              Susjedni commiti: roditelj iz zaglavlja commita; dijete preko{' '}
-              <code>git log --ancestry-path</code>.
-            </li>
-          </ul>
-        </Section>
-
-        <Section title={t('info.sections.limitations')}>
-          <ul>
-            <li>
-              Render limiti: ≤ 4 razine dubine, ≤ 12 unosa po direktoriju. Sve preko toga prikazuje
-              se kao <code>... N more</code>.
-            </li>
-            <li>Submoduli se ne tretiraju posebno.</li>
-            <li>
-              Hashovi prikazani u Git kartici su <strong>stvarni</strong> SHA-1 (poklapaju se s{' '}
-              <code>git ls-tree</code>).
-            </li>
-            <li>
-              Demo fallback se aktivira kada zadana prazna putanja ne može biti razriješena (npr.
-              poslužitelj nije pokrenut iz git repozitorija).
-            </li>
-          </ul>
-        </Section>
-
-        <Section title={t('info.sections.proof')}>
-          <p>
-            Dokaz da blob pripada commitu sastoji se od: sadržaja commit objekta, lanca tree
-            objekata od roditelja blob-a do root tree-a (svaki s punom listom unosa), i sha
-            blob-a. Klijent <strong>sam</strong> rekonstruira binarnu serijalizaciju svakog
-            tree-a (<code>&lt;mode&gt; &lt;ime&gt;\0&lt;binarni hash&gt;</code>, sortirano po
-            git-ovom pravilu, prefiksirano sa <code>tree &lt;veličina&gt;\0</code>), izračuna
-            SHA-1 i provjeri da odgovara hash-u koji git navodi. Na kraju hashira commit objekt
-            i provjeri da referencira root tree. Ovaj dokaz je byte-for-byte vjeran git-ovom
-            internom formatu — animacija pokazuje stvarne hash-eve, ne ilustrativne.
-          </p>
-        </Section>
-      </Card>
-    );
-  }
-
-  return (
-    <Card accent={accent} title="Git">
-      <Section title={t('info.sections.overview')}>
-        <p>
-          A Git repository is already a <strong>Merkle DAG</strong>. Every commit references a
-          tree (the root directory); every tree references blobs (file contents) and
-          sub-trees. Every reference is by SHA-1 hash; if one byte of any blob changes, every
-          parent SHA-1 up to the commit changes too. That is the Merkle property.
-        </p>
-      </Section>
-
-      <Section title={t('info.sections.dataflow')}>
-        <ul>
-          <li>User submits a GitHub URL or a local path (empty falls back to a demo).</li>
-          <li>
-            URL → <code>git clone --filter=blob:none --no-checkout</code> into a temp
-            directory. <em>Blobless</em> means only commit/tree objects are downloaded, not
-            file contents. Clones are reused on subsequent calls.
-          </li>
-          <li>
-            Local path → server validates with <code>git rev-parse --git-dir</code>.
-          </li>
-          <li>
-            <code>git cat-file -p &lt;commit&gt;</code> yields the tree SHA, parents, and
-            message; <code>git ls-tree</code> recursively walks the directory hierarchy.
-          </li>
-          <li>
-            Neighbor commits: parent comes from the commit header; child via{' '}
-            <code>git log --ancestry-path &lt;commit&gt;..HEAD</code>.
-          </li>
-        </ul>
-      </Section>
-
-      <Section title={t('info.sections.limitations')}>
-        <ul>
-          <li>
-            Render caps: ≤ 4 directories deep, ≤ 12 entries per directory. Anything beyond is
-            collapsed into <code>... N more</code>.
-          </li>
-          <li>Submodules are not specially handled.</li>
-          <li>
-            Hashes shown in the Git tab are the <strong>real</strong> SHA-1s — they match{' '}
-            <code>git ls-tree</code> output exactly.
-          </li>
-          <li>
-            A demo fallback kicks in when the default empty path can't be resolved (e.g. the
-            server isn't run from a git repo).
-          </li>
-        </ul>
-      </Section>
-
-      <Section title={t('info.sections.proof')}>
-        <p>
-          A proof that a blob belongs to a commit is: the commit object's content, the chain of
-          tree objects from the blob's parent up to the root tree (each with its full entry
-          list), and the blob's sha. The client <strong>itself</strong> reconstructs each tree's
-          binary serialization (<code>&lt;mode&gt; &lt;name&gt;\0&lt;binary-hash&gt;</code>,
-          sorted by git's rule, prefixed with <code>tree &lt;size&gt;\0</code>), runs SHA-1, and
-          asserts the result matches the SHA git reports. Finally it hashes the commit object
-          and confirms it references the root tree. This proof is byte-for-byte faithful to
-          git's on-disk format — the animation shows real hashes, not illustrative ones.
-        </p>
-      </Section>
-    </Card>
-  );
-}
-
-// ------- BITTORRENT TAB -------
-
-function BittorrentContent({ lang, t }) {
-  const accent = '#58d033';
-  if (lang === 'hr') {
-    return (
-      <Card accent={accent} title="BitTorrent">
-        <Section title={t('info.sections.overview')}>
-          <p>
-            <code>.torrent</code> datoteka opisuje sadržaj podijeljen u komade fiksne veličine.
-            Svaki komad ima hash; primatelj provjerava komade tokom prijenosa. U{' '}
-            <strong>BitTorrent v1</strong> (gotovo svi torrenti koji su danas u upotrebi),
-            <code> .torrent</code> sprema <em>plain</em> konkateniranu listu 20-bajtnih SHA-1
-            hashova — bez stabla. <strong>BitTorrent v2 (BEP 52, 2020.)</strong> koristi
-            per-file Merkle stabla (32-bajtne BLAKE2b hashove nad blokovima fiksne veličine) i
-            sprema samo per-file korijen u metapodatke.
-          </p>
-        </Section>
-
-        <Section title={t('info.sections.dataflow')}>
-          <ul>
-            <li>
-              Korisnik zalijepi URL <code>.torrent</code> datoteke ili odabere demo (prazno →
-              prvi demo).
-            </li>
-            <li>
-              Poslužitelj preuzima datoteku (limit 10 MB, timeout 15 s, prati redirekcije).
-            </li>
-            <li>
-              Vlastiti <strong>bencode</strong> dekoder parsira datoteku: dictove
-              (<code>d…e</code>), liste (<code>l…e</code>), integere (<code>i…e</code>) i
-              length-prefixed stringove (<code>&lt;n&gt;:&lt;bytes&gt;</code>).
-            </li>
-            <li>
-              Polje <code>info.pieces</code> je dugačak byte string — svakih 20 bajtova je SHA-1
-              jednog komada. Dekoder ih dijeli u listu hashova komada.
-            </li>
-            <li>
-              Prvih 64 hasheva komada koriste se kao listovi i{' '}
-              <code>createMerkleTree</code> gradi stablo iznad njih.
-            </li>
-            <li>
-              Demo torrenti koriste ručno odabrane reprezentativne hashove.
-            </li>
-          </ul>
-        </Section>
-
-        <Section title={t('info.sections.limitations')}>
-          <ul>
-            <li>
-              <strong>Stablo prikazano ovdje je konstruirano za vizualizaciju.</strong> Stvarni
-              v1 torrenti <em>ne</em> organiziraju hash-eve komada u Merkle stablo — drže ih u
-              ravnoj listi. v2 (BEP 52) je verzija koja stvarno koristi Merkle stabla, ali
-              parser ovdje sve tretira kao v1.
-            </li>
-            <li>
-              Prikaz je ograničen na 64 komada; veliki torrenti (Ubuntu ISO ima ~22 000 komada)
-              su skraćeni.
-            </li>
-            <li>
-              Demo torrenti koriste placeholder hash-eve koji nisu izračunati iz stvarnih
-              bajtova.
-            </li>
-            <li>Preuzimanja ograničena na 10 MB i 15 s.</li>
-          </ul>
-        </Section>
-
-        <Section title={t('info.sections.proof')}>
-          <p>
-            Ista <code>O(log n)</code> struktura dokaza kao u ostalim sustavima. U v2 torrentu
-            per-file Merkle korijen je upravo ono što je objavljeno u metapodacima, pa peer može
-            verificirati bilo koji komad u <code>log₂(n)</code> hash-eva. Animacija ovdje
-            demonstrira taj mehanizam na konstruiranom v1-stilu stabla.
-          </p>
-        </Section>
-      </Card>
-    );
-  }
-
-  return (
-    <Card accent={accent} title="BitTorrent">
-      <Section title={t('info.sections.overview')}>
-        <p>
-          A <code>.torrent</code> file describes a payload split into fixed-size pieces. Each
-          piece has a hash; the receiver verifies pieces as they arrive. In{' '}
-          <strong>BitTorrent v1</strong> (almost every torrent in the wild), the{' '}
-          <code>.torrent</code> stores a <em>flat</em> concatenated list of 20-byte SHA-1
-          piece hashes — there is no tree. <strong>BitTorrent v2 (BEP 52, 2020)</strong> uses
-          per-file Merkle trees (32-byte BLAKE2b hashes over fixed-size blocks) and only
-          stores the per-file root in the metadata.
-        </p>
-      </Section>
-
-      <Section title={t('info.sections.dataflow')}>
-        <ul>
-          <li>
-            User pastes a <code>.torrent</code> URL or picks a demo (empty → first demo loads).
-          </li>
-          <li>
-            Server downloads the file (10 MB cap, 15 s timeout, follows redirects).
-          </li>
-          <li>
-            A custom <strong>bencode</strong> decoder parses the file: dicts (<code>d…e</code>),
-            lists (<code>l…e</code>), integers (<code>i…e</code>), and length-prefixed strings
-            (<code>&lt;n&gt;:&lt;bytes&gt;</code>).
-          </li>
-          <li>
-            The <code>info.pieces</code> field is one long byte string — every 20 bytes is one
-            piece's SHA-1. The decoder slices it into the piece-hash array.
-          </li>
-          <li>
-            The first 64 piece hashes are taken as leaves and{' '}
-            <code>createMerkleTree</code> builds a Merkle tree on top.
-          </li>
-          <li>
-            Demo torrents use hand-authored representative piece hashes.
-          </li>
-        </ul>
-      </Section>
-
-      <Section title={t('info.sections.limitations')}>
-        <ul>
-          <li>
-            <strong>The Merkle tree shown here is constructed for visualization purposes.</strong>{' '}
-            Real v1 torrents <em>don't</em> organize their piece hashes into a Merkle tree —
-            they store a flat list. v2 (BEP 52) is the version that genuinely uses Merkle
-            trees, but the parser here treats every torrent as v1.
-          </li>
-          <li>
-            Display is capped at 64 pieces; large torrents (a real Ubuntu ISO has ~22,000
-            pieces) are truncated for the visualization.
-          </li>
-          <li>
-            Demo torrents use placeholder hashes that aren't computed from actual file bytes.
-          </li>
-          <li>Downloads are limited to 10 MB and 15 s.</li>
-        </ul>
-      </Section>
-
-      <Section title={t('info.sections.proof')}>
-        <p>
-          Same <code>O(log n)</code> proof structure as the other systems. In a v2 torrent the
-          per-file Merkle root is exactly what's published in the metadata, so a peer can
-          verify any piece against the root in <code>log₂(n)</code> hashes — that is the
-          protocol-level use case. The animation here demonstrates that mechanic on the
-          constructed v1-style tree.
-        </p>
-      </Section>
+      ))}
     </Card>
   );
 }
