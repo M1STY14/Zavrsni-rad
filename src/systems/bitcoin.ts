@@ -1,8 +1,20 @@
-const bitcoin = {
+import type { System } from '../types/system';
+import type { TreeFetchResult, TreeNode } from '../types/tree';
+
+const MAX_TX_LIST_SIZE = 1024;
+
+interface BitcoinTreeResponse {
+    tree: TreeNode;
+    rootHash: string;
+    block?: unknown;
+    error?: string;
+}
+
+const bitcoin: System = {
     id: 'bitcoin',
     name: 'Bitcoin',
     color: '#f7931a',
-    icon: '\u20BF',
+    icon: '₿',
     description: 'Visualize Merkle trees built from Bitcoin block transactions',
 
     inputs: [
@@ -17,8 +29,8 @@ const bitcoin = {
         return !!(params.blockHeight || params.blockHash || params.transactions);
     },
 
-    async fetchTree(params) {
-        let res;
+    async fetchTree(params): Promise<TreeFetchResult> {
+        let res: Response;
 
         if (params.blockHeight) {
             res = await fetch(`/api/bitcoin/block-by-height/${params.blockHeight}`);
@@ -38,7 +50,7 @@ const bitcoin = {
             throw new Error('Please provide a block height, block hash, or transaction list.');
         }
 
-        const data = await res.json();
+        const data: BitcoinTreeResponse = await res.json();
         if (data.error) throw new Error(data.error);
 
         return {
@@ -49,9 +61,7 @@ const bitcoin = {
     },
 };
 
-const MAX_TX_LIST_SIZE = 1024;
-
-export async function expandSubtree(rootHash, parentHash) {
+export async function expandSubtree(rootHash: string, parentHash: string): Promise<TreeNode> {
     const res = await fetch('/api/bitcoin/expand-subtree', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -59,12 +69,19 @@ export async function expandSubtree(rootHash, parentHash) {
     });
     const data = await res.json();
     if (!res.ok || data.error) throw new Error(data.error || 'Failed to expand subtree.');
-    return data.subtree;
+    return data.subtree as TreeNode;
 }
 
-export async function fetchAdjacentBlocks(height) {
-    const neighbors = [];
-    const targets = [
+export interface AdjacentBlock {
+    height: number;
+    tree: TreeNode;
+    rootHash: string;
+    side: 'left' | 'right';
+}
+
+export async function fetchAdjacentBlocks(height: number): Promise<AdjacentBlock[]> {
+    const neighbors: AdjacentBlock[] = [];
+    const targets: Array<{ h: number; side: 'left' | 'right' }> = [
         { h: height - 1, side: 'left' },
         { h: height + 1, side: 'right' },
     ];

@@ -1,19 +1,23 @@
-const bittorrent = {
+import type { System } from '../types/system';
+import type { TreeFetchResult } from '../types/tree';
+
+const bittorrent: System = {
     id: 'bittorrent',
     name: 'BitTorrent',
     color: '#58d033',
-    icon: '\uD83C\uDF10',
+    icon: '🌐',
     description: 'Visualize Merkle hash trees used for BitTorrent piece verification',
 
     inputs: [
         { key: 'torrentUrl', label: 'Torrent URL', type: 'text', placeholder: 'https://example.com/file.torrent' },
-        { key: 'demo', label: 'Demo Torrent', type: 'select',
-          options: [
-              { value: '', label: 'Select a demo torrent...' },
-              { value: 'ubuntu-24.04-desktop', label: 'Ubuntu 24.04 Desktop (8 pieces)' },
-              { value: 'sintel-trailer', label: 'Sintel Trailer (5 pieces)' },
-              { value: 'sample-multi', label: 'Multi-file Project (6 pieces)' },
-          ],
+        {
+            key: 'demo', label: 'Demo Torrent', type: 'select',
+            options: [
+                { value: '', label: 'Select a demo torrent...' },
+                { value: 'ubuntu-24.04-desktop', label: 'Ubuntu 24.04 Desktop (8 pieces)' },
+                { value: 'sintel-trailer', label: 'Sintel Trailer (5 pieces)' },
+                { value: 'sample-multi', label: 'Multi-file Project (6 pieces)' },
+            ],
         },
     ],
 
@@ -23,7 +27,7 @@ const bittorrent = {
         return true; // Always valid — empty submission loads the default demo
     },
 
-    async fetchTree(params) {
+    async fetchTree(params): Promise<TreeFetchResult> {
         const res = await fetch('/api/bittorrent/tree', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

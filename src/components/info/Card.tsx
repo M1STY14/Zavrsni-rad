@@ -1,6 +1,12 @@
-import React from 'react';
+import React, { type ReactNode } from 'react';
 
-export default function Card({ accent, title, children }) {
+interface CardProps {
+  accent?: string;
+  title: ReactNode;
+  children: ReactNode;
+}
+
+export default function Card({ accent, title, children }: CardProps) {
   return (
     <div className="info-card" style={accent ? { borderColor: `${accent}40` } : undefined}>
       <h3

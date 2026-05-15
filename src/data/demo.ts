@@ -2,7 +2,9 @@
 // as the "currentTree" fallback by AppShell so leaf-click handlers always have
 // a tree to walk. 5 levels, 16 leaves — the same shape every system produces.
 
-export const DEMO_TREE = {
+import type { TreeNode } from '../types/tree';
+
+export const DEMO_TREE: TreeNode = {
   name: "root_a7f3c892",
   children: [
     {

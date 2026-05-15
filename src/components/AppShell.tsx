@@ -1,23 +1,23 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import MerkleScene3D from './MerkleScene3D.jsx';
-import SceneErrorBoundary from './SceneErrorBoundary.jsx';
-import FloatingInputPanel from './FloatingInputPanel.jsx';
-import ProofVisualization from './ProofVisualization.jsx';
-import InfoModal from './InfoModal.jsx';
-import CloningModal from './modals/CloningModal.jsx';
-import BlockFetchingModal from './modals/BlockFetchingModal.jsx';
-import LanguageSwitcher from './LanguageSwitcher.jsx';
-import ClickHintToast from './ClickHintToast.jsx';
-import TruncationBanner from './TruncationBanner.jsx';
-import useAppPhase from '../hooks/useAppPhase.js';
-import useVisualization from '../hooks/useVisualization.js';
-import useProofClick from '../hooks/useProofClick.js';
-import { useT } from '../i18n/index.jsx';
+import SceneErrorBoundary from './SceneErrorBoundary';
+import FloatingInputPanel from './FloatingInputPanel';
+import ProofVisualization from './ProofVisualization';
+import InfoModal from './InfoModal';
+import CloningModal from './modals/CloningModal';
+import BlockFetchingModal from './modals/BlockFetchingModal';
+import LanguageSwitcher from './LanguageSwitcher';
+import ClickHintToast from './ClickHintToast';
+import TruncationBanner from './TruncationBanner';
+import useAppPhase from '../hooks/useAppPhase';
+import useVisualization from '../hooks/useVisualization';
+import useProofClick from '../hooks/useProofClick';
+import { useT } from '../i18n/index';
+import type { System } from '../types/system';
+import type { TreeNode } from '../types/tree';
 
-// Detect mobile viewport (used to flip a couple of camera/UI defaults in the
-// scene). Kept inline because it's a single boolean with one effect.
-function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+function useIsMobile(): boolean {
+  const [isMobile, setIsMobile] = useState<boolean>(() => window.innerWidth < 768);
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', onResize);
@@ -26,12 +26,10 @@ function useIsMobile() {
   return isMobile;
 }
 
-// True if the tree has any collapsed placeholders — drives the Bitcoin
-// truncation banner.
-function useIsTruncated(treeData) {
+function useIsTruncated(treeData: TreeNode | null): boolean {
   return useMemo(() => {
     if (!treeData) return false;
-    function walk(node) {
+    function walk(node: TreeNode | null | undefined): boolean {
       if (!node) return false;
       if (node.collapsed) return true;
       return node.children?.some(walk) ?? false;
@@ -56,8 +54,7 @@ export default function AppShell() {
 
   const isTruncated = useIsTruncated(viz.state.treeData);
 
-  // Composite handlers — actions that span hooks need a small bit of wiring.
-  const handleSystemChange = useCallback((system) => {
+  const handleSystemChange = useCallback((system: System) => {
     viz.actions.systemChanged(system);
     proof.clearProof();
   }, [viz.actions, proof]);
@@ -107,13 +104,13 @@ export default function AppShell() {
       <div className={`hero-overlay ${phase.heroVisible ? 'hero-visible' : 'hero-exit'}`}>
         <div className="hero-content">
           <h1 className="naslov_zavrsnog_rada">
-            {t('hero.title_line1')}
+            {String(t('hero.title_line1'))}
             <br />
-            {t('hero.title_line2')}
+            {String(t('hero.title_line2'))}
           </h1>
 
           <h1 style={{ fontSize: 'clamp(1.5rem, 3vw, 2rem)', fontWeight: 500, opacity: 0.9 }}>
-            {t('hero.such_as')}
+            {String(t('hero.such_as'))}
           </h1>
 
           <div className="Scroller">
@@ -140,17 +137,17 @@ export default function AppShell() {
           </div>
 
           <p style={{ marginTop: '2rem', fontSize: '1.15rem', maxWidth: '800px' }}>
-            {t('hero.description')}
+            {String(t('hero.description'))}
           </p>
 
           <button onClick={phase.enterExploring} style={{ marginTop: '2rem' }}>
-            {t('hero.start')}
+            {String(t('hero.start'))}
           </button>
         </div>
 
         <div className="main_footer">
           <p>Leo Kocijan &copy; {new Date().getFullYear()}</p>
-          <p>{t('footer.rights')}</p>
+          <p>{String(t('footer.rights'))}</p>
         </div>
       </div>
 
@@ -180,7 +177,7 @@ export default function AppShell() {
       <ClickHintToast message={proof.clickHint} />
 
       {phase.phase === 'exploring' && (
-        <button className="back-home-btn" onClick={handleBackToLanding} title={t('buttons.back_home')}>
+        <button className="back-home-btn" onClick={handleBackToLanding} title={String(t('buttons.back_home'))}>
           &#8592;
         </button>
       )}
@@ -190,7 +187,7 @@ export default function AppShell() {
       <button
         className={`info-button ${phase.phase === 'landing' ? 'info-button-landing' : ''}`}
         onClick={() => phase.setShowInfoModal(true)}
-        title={t('buttons.about')}
+        title={String(t('buttons.about'))}
       >
         i
       </button>
@@ -203,7 +200,7 @@ export default function AppShell() {
       />
 
       {loading && /^https?:\/\/|^git@/.test(inputValues.repoPath || '') && (
-        <CloningModal repoUrl={inputValues.repoPath} />
+        <CloningModal repoUrl={inputValues.repoPath || ''} />
       )}
 
       {loading && activeSystem.id === 'bitcoin' && (inputValues.blockHeight || inputValues.blockHash) && (
@@ -211,18 +208,18 @@ export default function AppShell() {
           label={
             inputValues.blockHeight
               ? `Block #${inputValues.blockHeight}`
-              : `${inputValues.blockHash.substring(0, 16)}...`
+              : `${inputValues.blockHash?.substring(0, 16)}...`
           }
         />
       )}
 
       {phase.phase === 'exploring' && treeData && (
         <div className="controls-hint">
-          <div><strong>{t('controls.title')}</strong></div>
-          <div>{t('controls.rotate')}</div>
-          <div>{t('controls.zoom')}</div>
-          <div>{t('controls.pan')}</div>
-          <div>{t('controls.proof')}</div>
+          <div><strong>{String(t('controls.title'))}</strong></div>
+          <div>{String(t('controls.rotate'))}</div>
+          <div>{String(t('controls.zoom'))}</div>
+          <div>{String(t('controls.pan'))}</div>
+          <div>{String(t('controls.proof'))}</div>
         </div>
       )}
     </div>

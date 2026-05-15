@@ -1,21 +1,29 @@
-import { Component } from 'react';
+import { Component, type ErrorInfo, type ReactNode } from 'react';
 
-export default class SceneErrorBoundary extends Component {
-  state = { error: null };
+interface Props {
+  children: ReactNode;
+}
 
-  static getDerivedStateFromError(error) {
+interface State {
+  error: Error | null;
+}
+
+export default class SceneErrorBoundary extends Component<Props, State> {
+  state: State = { error: null };
+
+  static getDerivedStateFromError(error: Error): State {
     return { error };
   }
 
-  componentDidCatch(error, info) {
+  componentDidCatch(error: Error, info: ErrorInfo): void {
     console.error('Scene crashed:', error, info);
   }
 
-  handleReload = () => {
+  handleReload = (): void => {
     window.location.reload();
   };
 
-  render() {
+  render(): ReactNode {
     if (!this.state.error) return this.props.children;
 
     return (

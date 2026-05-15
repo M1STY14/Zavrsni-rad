@@ -1,9 +1,14 @@
 import React from 'react';
-import { useLang, useT } from '../i18n/index.jsx';
+import { useLang, useT } from '../i18n/index';
+import type { AppPhase } from '../hooks/useAppPhase';
 
-const LABELS = { en: 'EN', hr: 'HR' };
+const LABELS: Record<string, string> = { en: 'EN', hr: 'HR' };
 
-export default function LanguageSwitcher({ phase }) {
+interface LanguageSwitcherProps {
+  phase: AppPhase;
+}
+
+export default function LanguageSwitcher({ phase }: LanguageSwitcherProps) {
   const { lang, setLang, langs } = useLang();
   const t = useT();
   return (
@@ -11,8 +16,8 @@ export default function LanguageSwitcher({ phase }) {
       className={`lang-select ${phase === 'landing' ? 'lang-select-landing' : ''}`}
       value={lang}
       onChange={(e) => setLang(e.target.value)}
-      title={t('buttons.language')}
-      aria-label={t('buttons.language')}
+      title={String(t('buttons.language'))}
+      aria-label={String(t('buttons.language'))}
     >
       {langs.map((l) => (
         <option key={l} value={l}>{LABELS[l] || l.toUpperCase()}</option>

@@ -1,8 +1,11 @@
-const git = {
+import type { System } from '../types/system';
+import type { TreeFetchResult, TreeNode } from '../types/tree';
+
+const git: System = {
     id: 'git',
     name: 'Git',
     color: '#6e5494',
-    icon: '\uD83D\uDD00',
+    icon: '🔀',
     description: 'Visualize Merkle trees from Git repository objects',
 
     inputs: [
@@ -16,7 +19,7 @@ const git = {
         return true;
     },
 
-    async fetchTree(params) {
+    async fetchTree(params): Promise<TreeFetchResult> {
         const res = await fetch('/api/git/tree', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -37,7 +40,14 @@ const git = {
     },
 };
 
-export async function fetchAdjacentCommits(commitSha, repoPath = '.') {
+export interface AdjacentCommit {
+    label: string;
+    tree: TreeNode;
+    rootHash: string;
+    side: 'left' | 'right';
+}
+
+export async function fetchAdjacentCommits(commitSha: string, repoPath: string = '.'): Promise<AdjacentCommit[]> {
     try {
         const res = await fetch(`/api/git/commit/${encodeURIComponent(commitSha)}/adjacent?repoPath=${encodeURIComponent(repoPath)}`);
         if (!res.ok) return [];
