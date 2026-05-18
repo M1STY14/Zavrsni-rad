@@ -14,10 +14,10 @@ const hr = {
     },
     controls: {
         title: 'Kontrole',
-        rotate: 'Klik i povuci — Rotacija',
-        zoom: 'Kotačić — Zumiranje',
-        pan: 'Strelice — Pomak',
-        proof: 'Klik na list — Prikaz dokaza',
+        rotate: 'Klik i povuci. Rotacija',
+        zoom: 'Kotačić. Zumiranje',
+        pan: 'Strelice. Pomak',
+        proof: 'Klik na list. Prikaz dokaza',
     },
     panel: {
         title: 'Merkle stablo',
@@ -33,7 +33,7 @@ const hr = {
         cloning_hint: 'Za veće repozitorije ovo može potrajati nekoliko sekundi',
         fetching_title: 'Dohvat bloka s mempool.space',
         fetching_hint:
-            'Izgradnja Merkle stabla — veliki blokovi mogu imati tisuće transakcija',
+            'Izgradnja Merkle stabla. Veliki blokovi mogu imati tisuće transakcija',
     },
     buttons: {
         back_home: 'Natrag na početnu',
@@ -74,9 +74,9 @@ const hr = {
         git_legend_blob: 'blob',
         git_legend_tree: 'stablo na putu',
         git_legend_commit: 'commit',
-        hint_internal_node: 'Unutarnji čvorovi nemaju zasebne dokaze — kliknite list za generiranje dokaza.',
+        hint_internal_node: 'Unutarnji čvorovi nemaju zasebne dokaze. Kliknite list za generiranje dokaza.',
         hint_max_depth: 'Dosegnut limit dubine prikaza. Kliknite "… više" placeholder za proširenje skraćene grane.',
-        banner_truncated: 'Ovaj blok ima mnogo transakcija — prikazane su samo gornje razine. Kliknite bilo koji "… više" placeholder za proširenje dublje grane.',
+        banner_truncated: 'Ovaj blok ima mnogo transakcija. Prikazane su samo gornje razine. Kliknite bilo koji "… više" placeholder za proširenje dublje grane.',
     },
     systems: {
         bitcoin: {
@@ -130,15 +130,14 @@ const hr = {
             git: 'Git',
             bittorrent: 'BitTorrent',
         },
-        full_doc_link: 'Pročitaj punu arhitekturnu referencu (ARCHITECTURE.md)',
         sections: {
             overview: 'Pregled',
+            endpoints: 'HTTP rute',
             dataflow: 'Tok podataka',
             limitations: 'Poznata ograničenja',
             proof: 'Generiranje i provjera dokaza',
         },
-        footer_line1: 'Leo Kocijan © 2025',
-        footer_line2: 'Završni rad — Vizualizacija Merkle stabala u stvarnim sustavima',
+        footer_line2: 'Završni rad. Vizualizacija Merkle stabala u stvarnim sustavima',
 
         general: {
             what_is_merkle_title: 'Što je Merkle stablo?',
@@ -153,8 +152,8 @@ const hr = {
                     <p style={{ marginTop: '0.6rem' }}>
                         Glavna korist: dokaz da je određeni list u stablu zahtijeva samo <code>log₂(n)</code>{' '}
                         hashova (sestrinske čvorove uz put do korijena), neovisno koliko je velik skup
-                        podataka. To omogućuje takozvani <strong>SPV</strong> stil verifikacije —
-                        laki klijenti provjeravaju članstvo bez preuzimanja cijelog skupa.
+                        podataka. To omogućuje takozvani <strong>SPV</strong> stil verifikacije.
+                        Laki klijenti provjeravaju članstvo bez preuzimanja cijelog skupa.
                     </p>
                 </>
             ),
@@ -190,25 +189,92 @@ const hr = {
                     </p>
                 </>
             ),
+            architecture_title: 'Arhitektura na visokoj razini',
+            architecture: (
+                <>
+                    <p>
+                        Preglednik nikada ne komunicira izravno s mempool.space, GitHub-om ili BitTorrent
+                        trackerom. Svaki vanjski zahtjev prolazi kroz Node/Express poslužitelj na portu 4000,
+                        koji je ujedno jedino mjesto gdje se SHA-256 zapravo izvršava. Frontend radi nad
+                        gotovim JSON stablom oblika <code>{'{ name, value, children }'}</code> i samo računa{' '}
+                        <em>putanje dokaza</em> (susjedne hash-eve uz put). Ne hashira ništa iznova.
+                    </p>
+                    <p style={{ marginTop: '0.6rem' }}>
+                        Dvije posljedice: (1) browser bundle ostaje bez <code>crypto</code> i nativnih modula,
+                        i (2) sve što zahtijeva binarku ili CLI (<code>git</code>, dohvat <code>.torrent</code>{' '}
+                        datoteke, komunikacija s mempool.space) centralizirano je u <code>server/</code>.
+                        Frontend je React + React Three Fiber; stanje vodi React Query, pa identični upiti
+                        dijele cache.
+                    </p>
+                </>
+            ),
+            merkle_core_title: 'Algoritam Merkle jezgre',
+            merkle_core: (
+                <>
+                    <p>
+                        Sva tri sustava na kraju pozivaju <code>createMerkleTree(leaves)</code> na poslužitelju.
+                        Funkcija hashira svaki ulazni list s <code>SHA-256</code>, pa razinu po razinu gradi:
+                        ako razina ima neparan broj čvorova, zadnji se <strong>duplicira</strong> da parovi
+                        budu čisti (isto pravilo koje koristi Bitcoin), a za svaki par <code>(L, R)</code> emitira
+                        roditelja s hashem <code>SHA-256(L.hash + R.hash)</code> — konkatenacija hex stringova
+                        pa jedan SHA-256.
+                    </p>
+                    <p style={{ marginTop: '0.6rem' }}>
+                        Rezultat se klijentu šalje kao JSON stablo oblika{' '}
+                        <code>{'{ name, value?, children?, collapsed?, leafCount? }'}</code>. Čim čvor prijeđe
+                        limit dubine prikaza (4 razine za Bitcoin, 4 razine i 12 unosa po direktoriju za Git,
+                        cijelo stablo za BitTorrent), postaje <code>collapsed</code> placeholder s brojem
+                        listova ispod sebe. Zbog toga UI može renderirati blokove s 4096 transakcija bez da
+                        zaglavi renderer.
+                    </p>
+                </>
+            ),
+            scene_proof_title: '3D scena i animacija dokaza',
+            scene_proof: (
+                <>
+                    <p>
+                        <strong>Raspored.</strong> <code>MerkleScene3D</code> raspoređuje JSON stablo kao{' '}
+                        <em>radijalni fraktal</em>: svaki roditelj postavlja djecu na luk čiji se polumjer
+                        smanjuje s dubinom, a kut ovisan o dubini sprječava preklapanje podstabala na dubinama
+                        viđenim u praksi. Listovi su obojeni prema sustavu; collapsed placeholderi koriste
+                        zaseban desaturirani materijal.
+                    </p>
+                    <p style={{ marginTop: '0.6rem' }}>
+                        <strong>Klik za inspekciju.</strong> Klik na unutarnji čvor briše odabir. Klik na list
+                        pokreće <code>findProofPath(tree, leafHash)</code>, koji ide od korijena, rekurzira u
+                        prvu granu koja sadrži cilj, i pri vraćanju bilježi jedan korak po razini:{' '}
+                        <code>{'{ level, nodeHash, siblingHash, siblingPosition, parentHash }'}</code>. Koraci
+                        se vraćaju redom od lista do korijena. Istim redom ide i verifikacija.
+                    </p>
+                    <p style={{ marginTop: '0.6rem' }}>
+                        <strong>Složenost.</strong> Za <em>n</em> listova: pretraga puta je <code>O(n)</code>{' '}
+                        u najgorem slučaju, ali ≈ <code>2·log₂(n)</code> na uravnoteženom stablu; sam dokaz
+                        je <code>log₂(n)</code> bratskih hash-eva (≈ 12 hash-eva / ~384 B hex zapisa za blok
+                        od 4096 transakcija); provjera je <code>log₂(n)</code> kombiniranja hash-eva. Ova
+                        logaritamska veličina dokaza je glavno svojstvo Merkle stabala i identično je u sva
+                        tri sustava.
+                    </p>
+                </>
+            ),
             tree_vs_dag_title: 'Merkle stablo nasuprot Merkle DAG-u',
             tree_vs_dag: (
                 <>
                     <p>
                         Iako sva tri sustava posjeduju "Merkle svojstvo" (promjena na bilo kojem listu mijenja
-                        korijen), <strong>strukture nisu iste</strong> — i to mijenja oblik dokaza.
+                        korijen), <strong>strukture nisu iste</strong>. I to mijenja oblik dokaza.
                     </p>
                     <p style={{ marginTop: '0.6rem' }}>
                         <strong>Bitcoin i BitTorrent</strong> grade <em>klasično binarno Merkle stablo</em>{' '}
                         iznad ravne liste vrijednosti (txid-ovi, hashovi komada). Svaki unutarnji čvor ima
                         točno dva djeteta; roditelj se računa kao <code>hash(lijevi || desni)</code>. Dokaz je{' '}
-                        <code>O(log n)</code> hash-eva — samo bratski hash na svakoj razini puta od lista do
+                        <code>O(log n)</code> hash-eva. Samo bratski hash na svakoj razini puta od lista do
                         korijena.
                     </p>
                     <p style={{ marginTop: '0.6rem' }}>
                         <strong>Git</strong> nije binarno stablo, već <em>Merkle DAG tipiziranih objekata</em>:
                         tree objekti (popisi direktorija) povezuju blob objekte (sadržaj datoteka). Hash tree
                         objekta računa se nad <em>cijelom serijaliziranom listom unosa</em> (mode, ime, dijete
-                        sha) — ne nad parovima. Zato dokaz da blob pripada commitu mora prikazati{' '}
+                        sha). Ne nad parovima. Zato dokaz da blob pripada commitu mora prikazati{' '}
                         <em>cijelu listu unosa</em> svakog tree-a na putu, ne samo bratski hash. To je{' '}
                         <code>O(dubina × stupanj)</code> bajtova, ali dokazuje i točan put datoteke u repozitoriju.
                     </p>
@@ -225,11 +291,25 @@ const hr = {
             overview: (
                 <p>
                     Bitcoin blok sadrži uređenu listu transakcija. Zaglavlje bloka uključuje{' '}
-                    <strong>Merkle korijen</strong> svih txid-ova — jedan hash koji commitira na cijeli
+                    <strong>Merkle korijen</strong> svih txid-ova. Jedan hash koji commitira na cijeli
                     sadržaj bloka. Svatko s tim korijenom i kratkim dokazom može provjeriti da je
                     određena transakcija u bloku, bez preuzimanja ostalih (mehanizam{' '}
                     <em>Simplified Payment Verification</em>, SPV).
                 </p>
+            ),
+            endpoints: (
+                <table className="info-endpoints">
+                    <thead>
+                        <tr><th>Metoda</th><th>Putanja</th><th>Svrha</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>GET</td><td><code>/api/bitcoin/block-by-height/:n</code></td><td>Visina → hash, dohvat txid-ova, izgradnja stabla.</td></tr>
+                        <tr><td>GET</td><td><code>/api/bitcoin/block/:hash</code></td><td>Isto, ali kreće od hash-a.</td></tr>
+                        <tr><td>POST</td><td><code>/api/bitcoin/expand-subtree</code></td><td>Otvara 4 razine dublje od ranije sažetog podstabla.</td></tr>
+                        <tr><td>POST</td><td><code>/api/bitcoin/merkle-from-list</code></td><td>Stablo iz korisnički unesene liste transakcija.</td></tr>
+                        <tr><td>POST</td><td><code>/api/bitcoin/merkle-proof</code></td><td>Stateless dokaz za jedan txid uz cjelovitu listu.</td></tr>
+                    </tbody>
+                </table>
             ),
             dataflow: (
                 <ul>
@@ -257,11 +337,11 @@ const hr = {
                 <ul>
                     <li>
                         <strong>Dva načina hashiranja:</strong> kada se učita stvarni blok preko visine ili
-                        hash-a, aplikacija koristi <em>stvaran Bitcoin algoritam</em> —{' '}
+                        hash-a, aplikacija koristi <em>stvaran Bitcoin algoritam</em>.{' '}
                         <code>SHA-256(SHA-256(left_bin || right_bin))</code> nad txid-ovima u internom
                         redoslijedu bajtova. Korijen koji se prikaže odgovara byte-for-byte onome u zaglavlju
                         bloka. Kada korisnik upiše vlastitu listu transakcija, koristi se <em>didaktička</em>{' '}
-                        varijanta — jednostruki SHA-256 nad hex konkatenacijom — jer korisnički unos nisu
+                        varijanta. Jednostruki SHA-256 nad hex konkatenacijom. Jer korisnički unos nisu
                         stvarni txid-ovi.
                     </li>
                     <li>
@@ -278,10 +358,10 @@ const hr = {
             proof: (
                 <p>
                     Klikom na list (transakciju) klijent zatraži dokaz od poslužitelja, koji ga generira
-                    iz cache-iranog cijelog stabla. Dokaz je <code>O(log n)</code> hash-eva — za blok od
+                    iz cache-iranog cijelog stabla. Dokaz je <code>O(log n)</code> hash-eva. Za blok od
                     4096 transakcija ~12 hash-eva (≈384 B). Klijent zatim <strong>sam ponovno izračuna</strong>{' '}
                     put prema gore koristeći Web Crypto (dvostruki SHA-256 nad binarnim parovima u
-                    internom redoslijedu) i provjeri da rezultat odgovara navedenom korijenu — animacija
+                    internom redoslijedu) i provjeri da rezultat odgovara navedenom korijenu. Animacija
                     korak-po-korak vodi kroz tu provjeru.
                 </p>
             ),
@@ -295,6 +375,17 @@ const hr = {
                     Sve reference su preko SHA-1 hashova; promjena jednog bajta u bilo kojem blobu
                     mijenja SHA-1 svakog roditelja sve do commita. To je upravo Merkle svojstvo.
                 </p>
+            ),
+            endpoints: (
+                <table className="info-endpoints">
+                    <thead>
+                        <tr><th>Metoda</th><th>Putanja</th><th>Svrha</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>POST</td><td><code>/api/git/tree</code></td><td>Gradi stablo za zadanu putanju repozitorija / commit.</td></tr>
+                        <tr><td>GET</td><td><code>/api/git/commit/:sha/adjacent</code></td><td>Vraća roditelja i dijete kao susjedna stabla.</td></tr>
+                    </tbody>
+                </table>
             ),
             dataflow: (
                 <ul>
@@ -345,7 +436,7 @@ const hr = {
                     git-ovom pravilu, prefiksirano sa <code>tree &lt;veličina&gt;\0</code>), izračuna
                     SHA-1 i provjeri da odgovara hash-u koji git navodi. Na kraju hashira commit objekt
                     i provjeri da referencira root tree. Ovaj dokaz je byte-for-byte vjeran git-ovom
-                    internom formatu — animacija pokazuje stvarne hash-eve, ne ilustrativne.
+                    internom formatu. Animacija pokazuje stvarne hash-eve, ne ilustrativne.
                 </p>
             ),
         },
@@ -357,10 +448,21 @@ const hr = {
                     Svaki komad ima hash; primatelj provjerava komade tokom prijenosa. U{' '}
                     <strong>BitTorrent v1</strong> (gotovo svi torrenti koji su danas u upotrebi),
                     <code> .torrent</code> sprema <em>plain</em> konkateniranu listu 20-bajtnih SHA-1
-                    hashova — bez stabla. <strong>BitTorrent v2 (BEP 52, 2020.)</strong> koristi
+                    hashova. Bez stabla. <strong>BitTorrent v2 (BEP 52, 2020.)</strong> koristi
                     per-file Merkle stabla (32-bajtne BLAKE2b hashove nad blokovima fiksne veličine) i
                     sprema samo per-file korijen u metapodatke.
                 </p>
+            ),
+            endpoints: (
+                <table className="info-endpoints">
+                    <thead>
+                        <tr><th>Metoda</th><th>Putanja</th><th>Svrha</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>POST</td><td><code>/api/bittorrent/tree</code></td><td>Preuzima/parsira <code>.torrent</code> URL ili učita demo.</td></tr>
+                        <tr><td>GET</td><td><code>/api/bittorrent/demos</code></td><td>Lista priloženih demo torrenta.</td></tr>
+                    </tbody>
+                </table>
             ),
             dataflow: (
                 <ul>
@@ -377,7 +479,7 @@ const hr = {
                         length-prefixed stringove (<code>&lt;n&gt;:&lt;bytes&gt;</code>).
                     </li>
                     <li>
-                        Polje <code>info.pieces</code> je dugačak byte string — svakih 20 bajtova je SHA-1
+                        Polje <code>info.pieces</code> je dugačak byte string. Svakih 20 bajtova je SHA-1
                         jednog komada. Dekoder ih dijeli u listu hashova komada.
                     </li>
                     <li>
@@ -393,7 +495,7 @@ const hr = {
                 <ul>
                     <li>
                         <strong>Stablo prikazano ovdje je konstruirano za vizualizaciju.</strong> Stvarni
-                        v1 torrenti <em>ne</em> organiziraju hash-eve komada u Merkle stablo — drže ih u
+                        v1 torrenti <em>ne</em> organiziraju hash-eve komada u Merkle stablo. Drže ih u
                         ravnoj listi. v2 (BEP 52) je verzija koja stvarno koristi Merkle stabla, ali
                         parser ovdje sve tretira kao v1.
                     </li>

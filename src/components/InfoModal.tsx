@@ -81,19 +81,10 @@ export default function InfoModal({ open, onClose, phase, activeSystemId }: Info
           {tab === 'bitcoin' && <SystemTab t={t} system="bitcoin" accent="#f7931a" title="Bitcoin" />}
           {tab === 'git' && <SystemTab t={t} system="git" accent="#9b7fc6" title="Git" />}
           {tab === 'bittorrent' && <SystemTab t={t} system="bittorrent" accent="#58d033" title="BitTorrent" />}
-
-          <a
-            href="https://github.com/"
-            onClick={(e) => e.preventDefault()}
-            className="info-doc-link"
-            title="ARCHITECTURE.md"
-          >
-            {String(t('info.full_doc_link'))}
-          </a>
         </div>
 
         <div className="info-modal-footer">
-          <p>{String(t('info.footer_line1'))}</p>
+          <p>Leo Kocijan © {new Date().getFullYear()}</p>
           <p>{String(t('info.footer_line2'))}</p>
         </div>
       </div>
@@ -111,13 +102,16 @@ function GeneralTab({ t }: TabProps) {
     { accent: '#667eea', title: t('info.general.what_app_does_title') as ReactNode, body: t('info.general.what_app_does') as ReactNode },
     { accent: '#f7931a', title: t('info.general.three_systems_title') as ReactNode, body: t('info.general.three_systems') as ReactNode },
     { accent: '#9b7fc6', title: t('info.general.tree_vs_dag_title') as ReactNode, body: t('info.general.tree_vs_dag') as ReactNode },
+    { accent: '#58d033', title: t('info.general.architecture_title') as ReactNode, body: t('info.general.architecture') as ReactNode },
+    { accent: '#ffd479', title: t('info.general.merkle_core_title') as ReactNode, body: t('info.general.merkle_core') as ReactNode },
+    { accent: '#ff6b9f', title: t('info.general.scene_proof_title') as ReactNode, body: t('info.general.scene_proof') as ReactNode },
   ];
   return (
-    <>
+    <div className="info-cards-grid">
       {cards.map((c, i) => (
         <Card key={i} accent={c.accent} title={c.title}>{c.body}</Card>
       ))}
-    </>
+    </div>
   );
 }
 
@@ -128,7 +122,7 @@ interface SystemTabProps extends TabProps {
 }
 
 function SystemTab({ t, system, accent, title }: SystemTabProps) {
-  const sections = ['overview', 'dataflow', 'limitations', 'proof'] as const;
+  const sections = ['overview', 'endpoints', 'dataflow', 'limitations', 'proof'] as const;
   return (
     <Card accent={accent} title={title}>
       {sections.map((s) => (

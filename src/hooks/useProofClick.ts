@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { DEMO_TREE } from '../data/demo';
-import { findNode } from '../utils/merkle';
+import { buildStructuralProof, findNode } from '../utils/merkle';
 import {
     verifyBinaryMerkleProof,
     verifyBitcoinMerkleProof,
@@ -120,11 +120,13 @@ export default function useProofClick({
     }, []);
 
     const handleNodeClick = useCallback(async (hash: string) => {
+        const isDemoMode = !treeData;
         const currentTree = treeData || (DEMO_TREE as TreeNode);
         const currentRoot = rootHash || DEMO_TREE.name;
 
         const node = findNode(currentTree, hash);
-        const isRealLeaf = node && !node.children?.length && !node.collapsed && node.value !== undefined;
+        const isLeaf = !!node && !node.children?.length && !node.collapsed;
+        const isRealLeaf = isLeaf && (isDemoMode || node!.value !== undefined);
         if (!isRealLeaf) {
             clearProof();
             const isMaxDepth = typeof node?.value === 'string' && node.value.endsWith('(max depth)');
@@ -132,6 +134,20 @@ export default function useProofClick({
             return;
         }
         setClickHint(null);
+
+        if (isDemoMode) {
+            const steps = buildStructuralProof(currentTree, hash) ?? [];
+            const pathHashes = new Set<string>([hash, ...steps.map(s => s.parentHash)]);
+            const siblingHashes = new Set<string>(steps.map(s => s.siblingHash));
+            setProofHighlight({ selectedLeaf: hash, pathHashes, siblingHashes });
+            setProofData({
+                selectedLeaf: hash,
+                rootHash: currentRoot,
+                steps,
+                verified: true,
+            });
+            return;
+        }
 
         if (activeSystem.id === 'git') {
             try {

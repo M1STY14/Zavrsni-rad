@@ -37,9 +37,33 @@ app.use('/api/', rateLimit({
     legacyHeaders: false,
 }));
 
+// Concurrency gate for /api/git/*. Clones can take up to 60s, and tab-spamming
+// large repos could otherwise pile work on the box. Cap at MAX_GIT_INFLIGHT;
+// over-budget requests get a fast 503 instead of queuing.
+const MAX_GIT_INFLIGHT = 3;
+let gitInflight = 0;
+
+function gitConcurrencyGate(req, res, next) {
+    if (gitInflight >= MAX_GIT_INFLIGHT) {
+        return res.status(503).json({
+            error: 'Server busy processing other git requests. Please try again in a moment.',
+        });
+    }
+    gitInflight++;
+    let released = false;
+    const release = () => {
+        if (released) return;
+        released = true;
+        gitInflight--;
+    };
+    res.on('finish', release);
+    res.on('close', release);
+    next();
+}
+
 // Mount system routes under /api/<system>/
 app.use('/api/bitcoin', bitcoinRoutes);
-app.use('/api/git', gitRoutes);
+app.use('/api/git', gitConcurrencyGate, gitRoutes);
 app.use('/api/bittorrent', bittorrentRoutes);
 
 // Health check

@@ -14,10 +14,10 @@ const en = {
     },
     controls: {
         title: 'Controls',
-        rotate: 'Click & Drag — Rotate',
-        zoom: 'Scroll — Zoom',
-        pan: 'Arrow Keys — Pan',
-        proof: 'Click a leaf — Show proof',
+        rotate: 'Click & Drag. Rotate',
+        zoom: 'Scroll. Zoom',
+        pan: 'Arrow Keys. Pan',
+        proof: 'Click a leaf. Show proof',
     },
     panel: {
         title: 'Merkle Tree',
@@ -33,7 +33,7 @@ const en = {
         cloning_hint: 'This may take a few seconds for large repositories',
         fetching_title: 'Fetching block from mempool.space',
         fetching_hint:
-            'Building the Merkle tree — large blocks can contain thousands of transactions',
+            'Building the Merkle tree. Large blocks can contain thousands of transactions',
     },
     buttons: {
         back_home: 'Back to home',
@@ -74,9 +74,9 @@ const en = {
         git_legend_blob: 'blob',
         git_legend_tree: 'tree on path',
         git_legend_commit: 'commit',
-        hint_internal_node: 'Internal nodes don\'t have individual proofs — click a leaf to generate one.',
+        hint_internal_node: 'Internal nodes don\'t have individual proofs. Click a leaf to generate one.',
         hint_max_depth: 'Reached the visualization depth limit. Click a "… more" placeholder to drill into a truncated branch.',
-        banner_truncated: 'This block has many transactions — only the top levels are rendered. Click any "… more" placeholder to expand a deeper branch.',
+        banner_truncated: 'This block has many transactions. Only the top levels are rendered. Click any "… more" placeholder to expand a deeper branch.',
     },
     systems: {
         bitcoin: {
@@ -130,15 +130,14 @@ const en = {
             git: 'Git',
             bittorrent: 'BitTorrent',
         },
-        full_doc_link: 'Read the full architecture reference (ARCHITECTURE.md)',
         sections: {
             overview: 'Overview',
+            endpoints: 'HTTP endpoints',
             dataflow: 'Data flow',
             limitations: 'Known limitations',
             proof: 'Proof generation & verification',
         },
-        footer_line1: 'Leo Kocijan © 2025',
-        footer_line2: 'Bachelor thesis — Visualization of Merkle Trees in Real-World Systems',
+        footer_line2: 'Bachelor thesis. Visualization of Merkle Trees in Real-World Systems',
 
         general: {
             what_is_merkle_title: 'What is a Merkle tree?',
@@ -154,7 +153,7 @@ const en = {
                         The headline benefit: proving that a specific leaf is in the tree only requires
                         <code> log₂(n) </code>
                         sibling hashes along the path to the root, regardless of dataset size. This is what
-                        enables <strong>SPV-style</strong> verification — light clients check membership
+                        enables <strong>SPV-style</strong> verification. Light clients check membership
                         without downloading the whole dataset.
                     </p>
                 </>
@@ -191,24 +190,91 @@ const en = {
                     </p>
                 </>
             ),
+            architecture_title: 'High-level architecture',
+            architecture: (
+                <>
+                    <p>
+                        The browser never talks directly to mempool.space, GitHub, or any BitTorrent tracker.
+                        Every external request flows through a Node/Express server on port 4000, which is also
+                        the only place where SHA-256 actually runs. The frontend works on a ready-built{' '}
+                        <code>{'{ name, value, children }'}</code> JSON tree and only computes proof <em>paths</em>{' '}
+                        (siblings along a route). It does not re-hash anything from scratch.
+                    </p>
+                    <p style={{ marginTop: '0.6rem' }}>
+                        Two consequences: (1) the browser bundle stays free of <code>crypto</code> and native
+                        modules, and (2) anything that needs a binary or a CLI (<code>git</code>, an HTTP fetch
+                        of a <code>.torrent</code>, talking to mempool.space) is centralised under{' '}
+                        <code>server/</code>. The frontend is React + React Three Fiber; state is managed with
+                        React Query so identical inputs share a cache across navigations.
+                    </p>
+                </>
+            ),
+            merkle_core_title: 'The Merkle core algorithm',
+            merkle_core: (
+                <>
+                    <p>
+                        All three systems eventually call <code>createMerkleTree(leaves)</code> on the server.
+                        It hashes every input leaf with <code>SHA-256</code>, then walks up level by level: if
+                        a level has an odd number of nodes, the last one is <strong>duplicated</strong> so
+                        pairs are clean (the same rule Bitcoin uses), and for each consecutive pair{' '}
+                        <code>(L, R)</code> a parent node is emitted with hash{' '}
+                        <code>SHA-256(L.hash + R.hash)</code> — concatenation as hex strings, then hashed once.
+                    </p>
+                    <p style={{ marginTop: '0.6rem' }}>
+                        The result is shipped to the client as a JSON tree of{' '}
+                        <code>{'{ name, value?, children?, collapsed?, leafCount? }'}</code>. Once a node hits
+                        a render depth cap (4 levels for Bitcoin, 4 levels and 12 entries per directory for
+                        Git, the full tree for BitTorrent), it becomes a <code>collapsed</code> placeholder
+                        carrying the number of leaves underneath. This is what lets the UI render 4096-tx
+                        blocks without freezing the renderer.
+                    </p>
+                </>
+            ),
+            scene_proof_title: '3D scene & proof animation',
+            scene_proof: (
+                <>
+                    <p>
+                        <strong>Layout.</strong> <code>MerkleScene3D</code> lays out the JSON tree as a{' '}
+                        <em>radial fractal</em>: every parent places its children on an arc whose radius
+                        shrinks with depth, and a depth-dependent angle keeps subtrees from overlapping at any
+                        depth seen in practice. Leaves are coloured by their host system; collapsed
+                        placeholders use a distinct desaturated material.
+                    </p>
+                    <p style={{ marginTop: '0.6rem' }}>
+                        <strong>Click to inspect.</strong> Clicking an internal node clears selection.
+                        Clicking a leaf runs <code>findProofPath(tree, leafHash)</code>, which walks from the
+                        root, recurses into the first branch containing the target, and on unwind records one
+                        step per level:{' '}
+                        <code>{'{ level, nodeHash, siblingHash, siblingPosition, parentHash }'}</code>. The
+                        steps come back in leaf-to-root order, which is the same order verification uses.
+                    </p>
+                    <p style={{ marginTop: '0.6rem' }}>
+                        <strong>Complexity.</strong> For <em>n</em> leaves: path-finding is <code>O(n)</code>{' '}
+                        worst case but ≈ <code>2·log₂(n)</code> on a balanced tree; the proof itself is{' '}
+                        <code>log₂(n)</code> sibling hashes (≈ 12 hashes / ~384 B of hex for a 4096-tx block);
+                        verification is <code>log₂(n)</code> hash combinations. This logarithmic proof size is
+                        the headline property of Merkle trees and is identical across all three systems.
+                    </p>
+                </>
+            ),
             tree_vs_dag_title: 'Merkle tree vs. Merkle DAG',
             tree_vs_dag: (
                 <>
                     <p>
                         All three systems share the Merkle property (changing any leaf changes the root), but{' '}
-                        <strong>the structures are not the same</strong> — and that changes the proof shape.
+                        <strong>the structures are not the same</strong>. And that changes the proof shape.
                     </p>
                     <p style={{ marginTop: '0.6rem' }}>
                         <strong>Bitcoin and BitTorrent</strong> build a <em>classic binary Merkle tree</em>{' '}
                         over a flat list of values (txids, piece hashes). Every internal node has exactly two
                         children; the parent is computed as <code>hash(left || right)</code>. The proof is{' '}
-                        <code>O(log n)</code> hashes — one sibling per level on the leaf-to-root path.
+                        <code>O(log n)</code> hashes. One sibling per level on the leaf-to-root path.
                     </p>
                     <p style={{ marginTop: '0.6rem' }}>
                         <strong>Git</strong> is not a binary tree but a <em>Merkle DAG of typed objects</em>:
                         tree objects (directory listings) link to blob objects (file contents). A tree's hash
-                        is computed over the <em>entire serialized entry list</em> (mode, name, child sha) —
-                        not over pairs. So a proof that a blob belongs to a commit must reveal{' '}
+                        is computed over the <em>entire serialized entry list</em> (mode, name, child sha).
+                        Not over pairs. So a proof that a blob belongs to a commit must reveal{' '}
                         <em>the full entry list</em> of every tree on the path, not just sibling hashes. That's{' '}
                         <code>O(depth × fanout)</code> bytes, but it also proves the file's exact path in the
                         repository.
@@ -226,11 +292,25 @@ const en = {
             overview: (
                 <p>
                     A Bitcoin block contains an ordered list of transactions. The block header includes a{' '}
-                    <strong>Merkle root</strong> of every txid — a single hash that commits to the block's
+                    <strong>Merkle root</strong> of every txid. A single hash that commits to the block's
                     contents. Anyone holding the root and a short proof can verify a single transaction is
                     in the block without downloading the rest (this is what powers <em>Simplified Payment
                     Verification</em>, SPV).
                 </p>
+            ),
+            endpoints: (
+                <table className="info-endpoints">
+                    <thead>
+                        <tr><th>Method</th><th>Path</th><th>Purpose</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>GET</td><td><code>/api/bitcoin/block-by-height/:n</code></td><td>Resolve height → hash, fetch txids, build tree.</td></tr>
+                        <tr><td>GET</td><td><code>/api/bitcoin/block/:hash</code></td><td>Same as above starting from a hash.</td></tr>
+                        <tr><td>POST</td><td><code>/api/bitcoin/expand-subtree</code></td><td>Drill 4 more levels into a previously collapsed subtree.</td></tr>
+                        <tr><td>POST</td><td><code>/api/bitcoin/merkle-from-list</code></td><td>Build a tree from a user-supplied transaction list.</td></tr>
+                        <tr><td>POST</td><td><code>/api/bitcoin/merkle-proof</code></td><td>Stateless proof for one txid given the full transaction list.</td></tr>
+                    </tbody>
+                </table>
             ),
             dataflow: (
                 <ul>
@@ -258,11 +338,11 @@ const en = {
                 <ul>
                     <li>
                         <strong>Two hashing modes:</strong> when a real block is loaded by height or hash,
-                        the app uses the <em>actual Bitcoin algorithm</em> —{' '}
+                        the app uses the <em>actual Bitcoin algorithm</em>.{' '}
                         <code>SHA-256(SHA-256(left_bin || right_bin))</code> over txids in their internal byte
                         order. The root the app displays byte-matches the merkle root in the block header
                         exactly. When the user supplies a custom transaction list, the app falls back to a{' '}
-                        <em>didactic</em> variant — single SHA-256 over hex-string concatenation — because
+                        <em>didactic</em> variant. Single SHA-256 over hex-string concatenation. Because
                         user-typed input isn't real Bitcoin txids.
                     </li>
                     <li>
@@ -282,10 +362,10 @@ const en = {
             proof: (
                 <p>
                     Clicking a leaf asks the server for an authoritative proof, which it generates from the
-                    cached full tree. The proof is <code>O(log n)</code> hashes — for a 4096-tx block that's
+                    cached full tree. The proof is <code>O(log n)</code> hashes. For a 4096-tx block that's
                     ~12 hashes (≈384 bytes). The client then <strong>re-runs</strong> the hash chain itself
                     using Web Crypto (double SHA-256 over binary pairs in internal byte order) and confirms
-                    the result matches the stated root — the animated panel walks step by step through that
+                    the result matches the stated root. The animated panel walks step by step through that
                     verification.
                 </p>
             ),
@@ -299,6 +379,17 @@ const en = {
                     sub-trees. Every reference is by SHA-1 hash; if one byte of any blob changes, every
                     parent SHA-1 up to the commit changes too. That is the Merkle property.
                 </p>
+            ),
+            endpoints: (
+                <table className="info-endpoints">
+                    <thead>
+                        <tr><th>Method</th><th>Path</th><th>Purpose</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>POST</td><td><code>/api/git/tree</code></td><td>Build a tree for a given repo path / commit ref.</td></tr>
+                        <tr><td>GET</td><td><code>/api/git/commit/:sha/adjacent</code></td><td>Return the parent and child commits as neighbour trees.</td></tr>
+                    </tbody>
+                </table>
             ),
             dataflow: (
                 <ul>
@@ -329,7 +420,7 @@ const en = {
                     </li>
                     <li>Submodules are not specially handled.</li>
                     <li>
-                        Hashes shown in the Git tab are the <strong>real</strong> SHA-1s — they match{' '}
+                        Hashes shown in the Git tab are the <strong>real</strong> SHA-1s. They match{' '}
                         <code>git ls-tree</code> output exactly.
                     </li>
                     <li>
@@ -347,7 +438,7 @@ const en = {
                     sorted by git's rule, prefixed with <code>tree &lt;size&gt;\0</code>), runs SHA-1, and
                     asserts the result matches the SHA git reports. Finally it hashes the commit object
                     and confirms it references the root tree. This proof is byte-for-byte faithful to
-                    git's on-disk format — the animation shows real hashes, not illustrative ones.
+                    git's on-disk format. The animation shows real hashes, not illustrative ones.
                 </p>
             ),
         },
@@ -359,10 +450,21 @@ const en = {
                     piece has a hash; the receiver verifies pieces as they arrive. In{' '}
                     <strong>BitTorrent v1</strong> (almost every torrent in the wild), the{' '}
                     <code>.torrent</code> stores a <em>flat</em> concatenated list of 20-byte SHA-1
-                    piece hashes — there is no tree. <strong>BitTorrent v2 (BEP 52, 2020)</strong> uses
+                    piece hashes. There is no tree. <strong>BitTorrent v2 (BEP 52, 2020)</strong> uses
                     per-file Merkle trees (32-byte BLAKE2b hashes over fixed-size blocks) and only
                     stores the per-file root in the metadata.
                 </p>
+            ),
+            endpoints: (
+                <table className="info-endpoints">
+                    <thead>
+                        <tr><th>Method</th><th>Path</th><th>Purpose</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>POST</td><td><code>/api/bittorrent/tree</code></td><td>Download/parse a <code>.torrent</code> URL, or load a demo.</td></tr>
+                        <tr><td>GET</td><td><code>/api/bittorrent/demos</code></td><td>List the bundled demo torrents.</td></tr>
+                    </tbody>
+                </table>
             ),
             dataflow: (
                 <ul>
@@ -378,7 +480,7 @@ const en = {
                         (<code>&lt;n&gt;:&lt;bytes&gt;</code>).
                     </li>
                     <li>
-                        The <code>info.pieces</code> field is one long byte string — every 20 bytes is one
+                        The <code>info.pieces</code> field is one long byte string. Every 20 bytes is one
                         piece's SHA-1. The decoder slices it into the piece-hash array.
                     </li>
                     <li>
@@ -394,8 +496,8 @@ const en = {
                 <ul>
                     <li>
                         <strong>The Merkle tree shown here is constructed for visualization purposes.</strong>{' '}
-                        Real v1 torrents <em>don't</em> organize their piece hashes into a Merkle tree —
-                        they store a flat list. v2 (BEP 52) is the version that genuinely uses Merkle
+                        Real v1 torrents <em>don't</em> organize their piece hashes into a Merkle tree.
+                        They store a flat list. v2 (BEP 52) is the version that genuinely uses Merkle
                         trees, but the parser here treats every torrent as v1.
                     </li>
                     <li>
@@ -412,7 +514,7 @@ const en = {
                 <p>
                     Same <code>O(log n)</code> proof structure as the other systems. In a v2 torrent the
                     per-file Merkle root is exactly what's published in the metadata, so a peer can
-                    verify any piece against the root in <code>log₂(n)</code> hashes — that is the
+                    verify any piece against the root in <code>log₂(n)</code> hashes. That is the
                     protocol-level use case. The animation here demonstrates that mechanic on the
                     constructed v1-style tree.
                 </p>

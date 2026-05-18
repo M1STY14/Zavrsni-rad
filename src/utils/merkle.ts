@@ -3,10 +3,52 @@
 // only navigates the displayed tree structure.
 
 import type { TreeNode } from '../types/tree';
+import type { ProofStep } from '../types/proof';
 
 export interface Leaf {
     hash: string;
     value: string | undefined;
+}
+
+// Walks the tree once and returns [root, ..., leaf] for the leaf with the given
+// hash, or null if not found.
+export function findPathToLeaf(tree: TreeNode | null | undefined, leafHash: string): TreeNode[] | null {
+    if (!tree) return null;
+    if (tree.name === leafHash) return [tree];
+    if (!tree.children) return null;
+    for (const child of tree.children) {
+        const sub = findPathToLeaf(child, leafHash);
+        if (sub) return [tree, ...sub];
+    }
+    return null;
+}
+
+// Builds ProofStep[] (leaf-up) from a tree's own structure. Used by the demo
+// tree, which has no backing server endpoint: the steps reference the tree's
+// existing node names verbatim, so the proof "verifies" against the same tree
+// the user is looking at.
+export function buildStructuralProof(tree: TreeNode, leafHash: string): ProofStep[] | null {
+    const path = findPathToLeaf(tree, leafHash);
+    if (!path || path.length < 2) return null;
+    const steps: ProofStep[] = [];
+    let currentHash = leafHash;
+    for (let i = path.length - 1; i > 0; i--) {
+        const parent = path[i - 1]!;
+        const node = path[i]!;
+        const siblings = parent.children ?? [];
+        const idx = siblings.findIndex(c => c.name === node.name);
+        const siblingIdx = idx === 0 ? 1 : 0;
+        const sibling = siblings[siblingIdx];
+        if (!sibling) return null;
+        steps.push({
+            nodeHash: currentHash,
+            siblingHash: sibling.name,
+            siblingPosition: siblingIdx === 0 ? 'left' : 'right',
+            parentHash: parent.name,
+        });
+        currentHash = parent.name;
+    }
+    return steps;
 }
 
 export function getAllLeaves(tree: TreeNode | null | undefined): Leaf[] {
