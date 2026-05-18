@@ -81,6 +81,35 @@ function generateMerkleProof(treeObj, leafValue) {
     return proof;
 }
 
+// Frontend-shaped proof: each step is {nodeHash, siblingHash, siblingPosition,
+// parentHash} so the visualizer can render the leaf-to-root chain directly.
+// Same correctness guarantees as generateMerkleProof — just packaged richer.
+function generateRichProof(treeObj, leafValue) {
+    const targetHash = sha256(leafValue);
+    const levels = treeObj.tree;
+    const leafLevel = levels[levels.length - 1];
+    let index = leafLevel.findIndex(node => node.hash === targetHash);
+    if (index === -1) throw new Error('Leaf not found in tree.');
+
+    const steps = [];
+    for (let i = levels.length - 1; i > 0; i--) {
+        const level = levels[i];
+        const parentLevel = levels[i - 1];
+        const isRight = index % 2 === 1;
+        const siblingIndex = isRight ? index - 1 : index + 1;
+        const sibling = siblingIndex < level.length ? level[siblingIndex] : level[index];
+        const parentIndex = Math.floor(index / 2);
+        steps.push({
+            nodeHash: level[index].hash,
+            siblingHash: sibling.hash,
+            siblingPosition: isRight ? 'left' : 'right',
+            parentHash: parentLevel[parentIndex].hash,
+        });
+        index = parentIndex;
+    }
+    return { leafHash: targetHash, steps };
+}
+
 // Verifikacija Merkle dokaza
 function verifyMerkleProof(leafValue, proof, rootHash) {
     let computedHash = sha256(leafValue);
@@ -101,20 +130,45 @@ function verifyMerkleProof(leafValue, proof, rootHash) {
     return computedHash === rootHash;
 }
 
-function transformTree(node) {
+function countLeaves(node) {
+    if (!node) return 0;
+    if (!node.left && !node.right) return 1;
+    return countLeaves(node.left) + countLeaves(node.right);
+}
+
+function transformTree(node, maxDepth, depth = 0) {
     if (!node) return null;
-    return {
-        name: node.hash,
-        children: node.left && node.right
-            ? [transformTree(node.left), transformTree(node.right)]
-            : []
-    };
+    const result = { name: node.hash };
+    if (node.value !== undefined) result.value = node.value;
+    const hasChildren = node.left || node.right;
+    if (hasChildren) {
+        if (maxDepth !== undefined && depth >= maxDepth) {
+            // Collapse deep subtree into a placeholder leaf with a count.
+            result.collapsed = true;
+            result.leafCount = countLeaves(node);
+            return result;
+        }
+        result.children = [];
+        if (node.left) result.children.push(transformTree(node.left, maxDepth, depth + 1));
+        if (node.right) result.children.push(transformTree(node.right, maxDepth, depth + 1));
+    }
+    return result;
+}
+
+// Locate a subtree by its root hash inside a fully-built internal tree
+// (the structure produced by createMerkleTree, with `hash`, `left`, `right`).
+function findSubtreeByHash(node, hash) {
+    if (!node) return null;
+    if (node.hash === hash) return node;
+    return findSubtreeByHash(node.left, hash) || findSubtreeByHash(node.right, hash);
 }
 
 // Export funkcija
 module.exports = {
     createMerkleTree,
     generateMerkleProof,
+    generateRichProof,
     verifyMerkleProof,
-    transformTree
+    transformTree,
+    findSubtreeByHash
 };

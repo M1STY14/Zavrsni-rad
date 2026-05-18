@@ -1,0 +1,17 @@
+services:
+  merkle:
+    build: .
+    container_name: merkle-visualizer
+    restart: unless-stopped
+    ports:
+      # Bind to localhost only — nginx on the host reverse-proxies to this.
+      # Docker would otherwise punch through ufw and expose :4000 publicly.
+      - "127.0.0.1:4000:4000"
+    # CAX11 = 2 vCPU / 4 GB. Leave headroom for the reverse proxy, the
+    # portfolio, and the OS — cap this container at 1.5 vCPU / 3 GB.
+    cpus: 1.5
+    mem_limit: 3g
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      CORS_ORIGINS: https://mtv.leokocijan.dev
