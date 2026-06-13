@@ -2,6 +2,10 @@ import { Component, type ErrorInfo, type ReactNode } from 'react';
 
 interface Props {
   children: ReactNode;
+  // When provided, a runtime crash in the 3D scene (e.g. a lost WebGL context)
+  // is reported instead of showing the fallback UI, so the parent can switch to
+  // the 2D view gracefully rather than leaving the user on an error screen.
+  onError?: () => void;
 }
 
 interface State {
@@ -17,6 +21,7 @@ export default class SceneErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
     console.error('Scene crashed:', error, info);
+    this.props.onError?.();
   }
 
   handleReload = (): void => {
@@ -24,6 +29,9 @@ export default class SceneErrorBoundary extends Component<Props, State> {
   };
 
   render(): ReactNode {
+    // If a handler is wired up, defer to the parent's fallback (2D view) and
+    // render nothing here while it swaps us out.
+    if (this.state.error && this.props.onError) return null;
     if (!this.state.error) return this.props.children;
 
     return (

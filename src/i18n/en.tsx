@@ -17,7 +17,16 @@ const en = {
         rotate: 'Click & Drag. Rotate',
         zoom: 'Scroll. Zoom',
         pan: 'Arrow Keys. Pan',
+        zoom2d: 'Scroll. Zoom',
+        pan2d: 'Drag. Pan',
         proof: 'Click a leaf. Show proof',
+    },
+    view: {
+        mode_2d: '2D',
+        mode_3d: '3D',
+        toggle_title: 'Toggle 2D / 3D view',
+        webgl_unavailable:
+            'WebGL is unavailable in this browser — showing the simplified 2D view. Enable hardware acceleration for the 3D visualization.',
     },
     panel: {
         title: 'Merkle Tree',
