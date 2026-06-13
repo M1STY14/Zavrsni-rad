@@ -17,7 +17,16 @@ const hr = {
         rotate: 'Klik i povuci. Rotacija',
         zoom: 'Kotačić. Zumiranje',
         pan: 'Strelice. Pomak',
+        zoom2d: 'Kotačić. Zumiranje',
+        pan2d: 'Povuci. Pomak',
         proof: 'Klik na list. Prikaz dokaza',
+    },
+    view: {
+        mode_2d: '2D',
+        mode_3d: '3D',
+        toggle_title: 'Prebaci 2D / 3D prikaz',
+        webgl_unavailable:
+            'WebGL nije dostupan u ovom pregledniku — prikazan je pojednostavljeni 2D prikaz. Uključite hardversko ubrzanje za 3D vizualizaciju.',
     },
     panel: {
         title: 'Merkle stablo',
