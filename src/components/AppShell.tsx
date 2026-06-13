@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import MerkleScene3D from './MerkleScene3D.jsx';
+import MerkleScene2D from './MerkleScene2D';
 import SceneErrorBoundary from './SceneErrorBoundary';
 import FloatingInputPanel from './FloatingInputPanel';
 import ProofVisualization from './ProofVisualization';
@@ -7,8 +8,11 @@ import InfoModal from './InfoModal';
 import CloningModal from './modals/CloningModal';
 import BlockFetchingModal from './modals/BlockFetchingModal';
 import LanguageSwitcher from './LanguageSwitcher';
+import ViewModeToggle, { type ViewMode } from './ViewModeToggle';
+import WebGLBanner from './WebGLBanner';
 import ClickHintToast from './ClickHintToast';
 import TruncationBanner from './TruncationBanner';
+import { isWebGLAvailable } from '../utils/webgl';
 import useAppPhase from '../hooks/useAppPhase';
 import useVisualization from '../hooks/useVisualization';
 import useProofClick from '../hooks/useProofClick';
@@ -41,6 +45,12 @@ function useIsTruncated(treeData: TreeNode | null): boolean {
 export default function AppShell() {
   const t = useT();
   const isMobile = useIsMobile();
+
+  // Detected once: if the browser can't give us a WebGL context, lock to the
+  // 2D view. Otherwise the user picks via the 2D/3D toggle (default 3D).
+  const [webglAvailable] = useState<boolean>(() => isWebGLAvailable());
+  const [viewMode, setViewMode] = useState<ViewMode>(webglAvailable ? '3d' : '2d');
+  const effectiveView: ViewMode = webglAvailable ? viewMode : '2d';
 
   const phase = useAppPhase();
   const viz = useVisualization(t);
@@ -79,26 +89,36 @@ export default function AppShell() {
   return (
     <div className="app-shell">
       <div className="scene-container">
-        <SceneErrorBoundary>
-          <MerkleScene3D
-            phase={phase.phase}
+        {effectiveView === '3d' ? (
+          <SceneErrorBoundary onError={() => setViewMode('2d')}>
+            <MerkleScene3D
+              phase={phase.phase}
+              treeData={treeData}
+              proofHighlight={proof.proofHighlight}
+              onNodeClick={proof.handleNodeClick}
+              onExpandCollapsed={expandCollapsed}
+              expandingHashes={expandingHashes}
+              isMobile={isMobile}
+              onTransitionComplete={handleTransitionComplete}
+              neighborBlocks={neighborBlocks}
+              blockHeight={
+                activeSystem.id === 'bitcoin' && inputValues.blockHeight
+                  ? parseInt(inputValues.blockHeight, 10)
+                  : activeSystem.id === 'git' && treeData
+                    ? (inputValues.commitHash || 'HEAD').substring(0, 7)
+                    : null
+              }
+            />
+          </SceneErrorBoundary>
+        ) : (
+          <MerkleScene2D
             treeData={treeData}
             proofHighlight={proof.proofHighlight}
             onNodeClick={proof.handleNodeClick}
             onExpandCollapsed={expandCollapsed}
             expandingHashes={expandingHashes}
-            isMobile={isMobile}
-            onTransitionComplete={handleTransitionComplete}
-            neighborBlocks={neighborBlocks}
-            blockHeight={
-              activeSystem.id === 'bitcoin' && inputValues.blockHeight
-                ? parseInt(inputValues.blockHeight, 10)
-                : activeSystem.id === 'git' && treeData
-                  ? (inputValues.commitHash || 'HEAD').substring(0, 7)
-                  : null
-            }
           />
-        </SceneErrorBoundary>
+        )}
       </div>
 
       <div className={`hero-overlay ${phase.heroVisible ? 'hero-visible' : 'hero-exit'}`}>
@@ -184,6 +204,10 @@ export default function AppShell() {
 
       <LanguageSwitcher phase={phase.phase} />
 
+      <ViewModeToggle mode={viewMode} onChange={setViewMode} disabled={!webglAvailable} />
+
+      <WebGLBanner visible={!webglAvailable} />
+
       <button
         className={`info-button ${phase.phase === 'landing' ? 'info-button-landing' : ''}`}
         onClick={() => phase.setShowInfoModal(true)}
@@ -216,9 +240,18 @@ export default function AppShell() {
       {phase.phase === 'exploring' && treeData && (
         <div className="controls-hint">
           <div><strong>{String(t('controls.title'))}</strong></div>
-          <div>{String(t('controls.rotate'))}</div>
-          <div>{String(t('controls.zoom'))}</div>
-          <div>{String(t('controls.pan'))}</div>
+          {effectiveView === '3d' ? (
+            <>
+              <div>{String(t('controls.rotate'))}</div>
+              <div>{String(t('controls.zoom'))}</div>
+              <div>{String(t('controls.pan'))}</div>
+            </>
+          ) : (
+            <>
+              <div>{String(t('controls.zoom2d'))}</div>
+              <div>{String(t('controls.pan2d'))}</div>
+            </>
+          )}
           <div>{String(t('controls.proof'))}</div>
         </div>
       )}
