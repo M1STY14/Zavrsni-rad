@@ -162,7 +162,8 @@ const hr = {
                         Glavna korist: dokaz da je određeni list u stablu zahtijeva samo <code>log₂(n)</code>{' '}
                         hashova (sestrinske čvorove uz put do korijena), neovisno koliko je velik skup
                         podataka. To omogućuje takozvani <strong>SPV</strong> stil verifikacije.
-                        Laki klijenti provjeravaju članstvo bez preuzimanja cijelog skupa.
+                        Klijenti s ograničenim resursima tako provjeravaju pripadnost bez preuzimanja
+                        cijelog skupa.
                     </p>
                 </>
             ),
@@ -170,7 +171,8 @@ const hr = {
             what_app_does: (
                 <p>
                     Aplikacija dohvaća stvarne podatke iz tri sustava (Bitcoin, Git, BitTorrent), gradi
-                    odgovarajuće Merkle stablo i prikazuje ga kao 3D fraktalnu strukturu pomoću Three.js.
+                    odgovarajuće Merkle stablo i prikazuje ga kao 3D fraktalnu strukturu pomoću Three.js, uz
+                    ravnopravan 2D prikaz u SVG-u.
                     Klikom na list pokreće se animirani Merkle dokaz: aplikacija označava put od lista do
                     korijena, prikazuje sestrinske hashove na svakoj razini i ponovno hashira korak po
                     korak kako bi pokazala da rezultat odgovara korijenu.
@@ -202,15 +204,17 @@ const hr = {
             architecture: (
                 <>
                     <p>
-                        Preglednik nikada ne komunicira izravno s mempool.space, GitHub-om ili BitTorrent
-                        trackerom. Svaki vanjski zahtjev prolazi kroz Node/Express poslužitelj na portu 4000,
-                        koji je ujedno jedino mjesto gdje se SHA-256 zapravo izvršava. Frontend radi nad
-                        gotovim JSON stablom oblika <code>{'{ name, value, children }'}</code> i samo računa{' '}
-                        <em>putanje dokaza</em> (susjedne hash-eve uz put). Ne hashira ništa iznova.
+                        Preglednik nikada ne komunicira izravno s mempool.space, udaljenim Git repozitorijem
+                        ili BitTorrent trackerom. Svaki vanjski zahtjev prolazi kroz Node/Express poslužitelj
+                        na portu 4000, koji gradi stablo i generira dokaze. Frontend radi nad gotovim JSON
+                        stablom oblika <code>{'{ name, value, children }'}</code>, a primljeni dokaz{' '}
+                        <strong>sam ponovno izračuna</strong> preko Web Crypto API-ja. Poslužitelj dokaz
+                        stvara, klijent ga neovisno provjerava.
                     </p>
                     <p style={{ marginTop: '0.6rem' }}>
-                        Dvije posljedice: (1) browser bundle ostaje bez <code>crypto</code> i nativnih modula,
-                        i (2) sve što zahtijeva binarku ili CLI (<code>git</code>, dohvat <code>.torrent</code>{' '}
+                        Dvije posljedice: (1) browser bundle ostaje bez <code>crypto</code> paketa i nativnih
+                        modula, jer se hashira ugrađenim sučeljem preglednika, i (2) sve što zahtijeva binarku
+                        ili CLI (<code>git</code>, dohvat <code>.torrent</code>{' '}
                         datoteke, komunikacija s mempool.space) centralizirano je u <code>server/</code>.
                         Frontend je React + React Three Fiber; stanje vodi React Query, pa identični upiti
                         dijele cache.
@@ -221,7 +225,9 @@ const hr = {
             merkle_core: (
                 <>
                     <p>
-                        Sva tri sustava na kraju pozivaju <code>createMerkleTree(leaves)</code> na poslužitelju.
+                        BitTorrent i korisnički unesena lista transakcija pozivaju{' '}
+                        <code>createMerkleTree(leaves)</code> na poslužitelju (stvarni Bitcoin blokovi idu
+                        kroz <code>bitcoin-merkle.js</code>, a Git kroz <code>git-proof.js</code>).
                         Funkcija hashira svaki ulazni list s <code>SHA-256</code>, pa razinu po razinu gradi:
                         ako razina ima neparan broj čvorova, zadnji se <strong>duplicira</strong> da parovi
                         budu čisti (isto pravilo koje koristi Bitcoin), a za svaki par <code>(L, R)</code> emitira
@@ -238,28 +244,37 @@ const hr = {
                     </p>
                 </>
             ),
-            scene_proof_title: '3D scena i animacija dokaza',
+            scene_proof_title: 'Scena i animacija dokaza',
             scene_proof: (
                 <>
                     <p>
                         <strong>Raspored.</strong> <code>MerkleScene3D</code> raspoređuje JSON stablo kao{' '}
                         <em>radijalni fraktal</em>: svaki roditelj postavlja djecu na luk čiji se polumjer
                         smanjuje s dubinom, a kut ovisan o dubini sprječava preklapanje podstabala na dubinama
-                        viđenim u praksi. Listovi su obojeni prema sustavu; collapsed placeholderi koriste
-                        zaseban desaturirani materijal.
+                        viđenim u praksi. Obični se čvorovi boje <strong>prema dubini</strong> (paleta od
+                        pet boja), sažeti placeholderi su <strong>narančasti</strong> i nešto veći, kao poziv
+                        na klik, a satelitska stabla susjednih blokova koriste prigušenu paletu da ostanu u
+                        pozadini.
+                    </p>
+                    <p style={{ marginTop: '0.6rem' }}>
+                        <strong>2D zamjena.</strong> Isto stablo iscrtava i <code>MerkleScene2D</code>, kao
+                        SVG s klasičnim rasporedom. Prekidač u sučelju mijenja prikaz, a ako preglednik nema
+                        WebGL, aplikacija sama prelazi na 2D. Odabir lista, širenje sažetih čvorova i
+                        isticanje puta dokaza rade jednako u obama prikazima.
                     </p>
                     <p style={{ marginTop: '0.6rem' }}>
                         <strong>Klik za inspekciju.</strong> Klik na unutarnji čvor briše odabir. Klik na list
-                        pokreće <code>findProofPath(tree, leafHash)</code>, koji ide od korijena, rekurzira u
-                        prvu granu koja sadrži cilj, i pri vraćanju bilježi jedan korak po razini:{' '}
-                        <code>{'{ level, nodeHash, siblingHash, siblingPosition, parentHash }'}</code>. Koraci
-                        se vraćaju redom od lista do korijena. Istim redom ide i verifikacija.
+                        šalje zahtjev na <code>/proof</code> krajnju točku odabranog sustava. Poslužitelj iz
+                        cache-iranog cijelog stabla obilazi put od lista prema korijenu i vraća jedan korak po
+                        razini:{' '}
+                        <code>{'{ nodeHash, siblingHash, siblingPosition, parentHash }'}</code>. Koraci
+                        dolaze redom od lista do korijena. Istim redom ide i verifikacija, koju klijent radi
+                        sam preko Web Crypto API-ja.
                     </p>
                     <p style={{ marginTop: '0.6rem' }}>
-                        <strong>Složenost.</strong> Za <em>n</em> listova: pretraga puta je <code>O(n)</code>{' '}
-                        u najgorem slučaju, ali ≈ <code>2·log₂(n)</code> na uravnoteženom stablu; sam dokaz
-                        je <code>log₂(n)</code> bratskih hash-eva (≈ 12 hash-eva / ~384 B hex zapisa za blok
-                        od 4096 transakcija); provjera je <code>log₂(n)</code> kombiniranja hash-eva. Ova
+                        <strong>Složenost.</strong> Za <em>n</em> listova: dokaz je <code>log₂(n)</code>{' '}
+                        bratskih hash-eva (≈ 12 hash-eva / ~384 B hex zapisa za blok od 4096 transakcija), a
+                        provjera je <code>log₂(n)</code> kombiniranja hash-eva. Ova
                         logaritamska veličina dokaza je glavno svojstvo Merkle stabala i identično je u sva
                         tri sustava.
                     </p>
@@ -316,6 +331,7 @@ const hr = {
                         <tr><td>GET</td><td><code>/api/bitcoin/block/:hash</code></td><td>Isto, ali kreće od hash-a.</td></tr>
                         <tr><td>POST</td><td><code>/api/bitcoin/expand-subtree</code></td><td>Otvara 4 razine dublje od ranije sažetog podstabla.</td></tr>
                         <tr><td>POST</td><td><code>/api/bitcoin/merkle-from-list</code></td><td>Stablo iz korisnički unesene liste transakcija.</td></tr>
+                        <tr><td>POST</td><td><code>/api/bitcoin/proof</code></td><td>Dokaz za jedan txid iz cache-iranog stabla (410 nakon evikcije).</td></tr>
                         <tr><td>POST</td><td><code>/api/bitcoin/merkle-proof</code></td><td>Stateless dokaz za jedan txid uz cjelovitu listu.</td></tr>
                     </tbody>
                 </table>
@@ -328,8 +344,10 @@ const hr = {
                         txid-ova.
                     </li>
                     <li>
-                        Listovi se hashiraju, a roditelji se grade po pravilu{' '}
-                        <code>SHA-256(hexL + hexR)</code> dok se ne dobije korijen.
+                        Stablo gradi <code>bitcoin-merkle.js</code>: txid-ovi se <em>ne</em> hashiraju
+                        ponovno, nego se parovi spajaju u internom poretku bajtova i hashiraju s{' '}
+                        <code>SHA-256(SHA-256(binL || binR))</code> do korijena. Korisnički unesena lista ide
+                        kroz didaktičku varijantu, <code>SHA-256(hexL + hexR)</code>.
                     </li>
                     <li>
                         Cijelo stablo se cache-ira u memoriji (LRU, 16 unosa). Klijentu se šalju samo
@@ -393,6 +411,7 @@ const hr = {
                     <tbody>
                         <tr><td>POST</td><td><code>/api/git/tree</code></td><td>Gradi stablo za zadanu putanju repozitorija / commit.</td></tr>
                         <tr><td>GET</td><td><code>/api/git/commit/:sha/adjacent</code></td><td>Vraća roditelja i dijete kao susjedna stabla.</td></tr>
+                        <tr><td>POST</td><td><code>/api/git/proof</code></td><td>Lanac stabala od bloba do commita, s punim popisom unosa.</td></tr>
                     </tbody>
                 </table>
             ),
@@ -402,7 +421,7 @@ const hr = {
                         Korisnik unese GitHub URL ili lokalnu putanju (ili ostavi prazno za demo).
                     </li>
                     <li>
-                        URL → <code>git clone --filter=blob:none --no-checkout</code> u privremeni
+                        URL → <code>git clone --filter=blob:none --no-checkout --single-branch</code> u privremeni
                         direktorij. <em>Blobless</em> klon dohvaća samo commit/tree objekte, ne i sadržaj
                         datoteka. Klonovi se ponovno koriste.
                     </li>
@@ -457,9 +476,12 @@ const hr = {
                     Svaki komad ima hash; primatelj provjerava komade tokom prijenosa. U{' '}
                     <strong>BitTorrent v1</strong> (gotovo svi torrenti koji su danas u upotrebi),
                     <code> .torrent</code> sprema <em>plain</em> konkateniranu listu 20-bajtnih SHA-1
-                    hashova. Bez stabla. <strong>BitTorrent v2 (BEP 52, 2020.)</strong> koristi
-                    per-file Merkle stabla (32-bajtne BLAKE2b hashove nad blokovima fiksne veličine) i
-                    sprema samo per-file korijen u metapodatke.
+                    hashova. Bez stabla. <strong>BitTorrent v2 (BEP 52)</strong>, šire dostupan od
+                    2020. s libtorrentom 2.0, koristi per-file Merkle stabla (32-bajtne SHA-256
+                    hashove nad blokovima od 16 KiB) i u metapodatke sprema per-file korijen
+                    (<code>pieces root</code>) te, izvan <code>info</code> rječnika, sloj hashova na
+                    razini komada (<code>piece layers</code>); niže slojeve stabla peerovi razmjenjuju
+                    po potrebi.
                 </p>
             ),
             endpoints: (
@@ -469,6 +491,7 @@ const hr = {
                     </thead>
                     <tbody>
                         <tr><td>POST</td><td><code>/api/bittorrent/tree</code></td><td>Preuzima/parsira <code>.torrent</code> URL ili učita demo.</td></tr>
+                        <tr><td>POST</td><td><code>/api/bittorrent/proof</code></td><td>Dokaz za jedan komad iz cache-iranog stabla.</td></tr>
                         <tr><td>GET</td><td><code>/api/bittorrent/demos</code></td><td>Lista priloženih demo torrenta.</td></tr>
                     </tbody>
                 </table>
@@ -496,7 +519,8 @@ const hr = {
                         <code>createMerkleTree</code> gradi stablo iznad njih.
                     </li>
                     <li>
-                        Demo torrenti koriste ručno odabrane reprezentativne hashove.
+                        Demo torrenti koriste ručno napisane placeholder hashove (nisu izračunati iz
+                        stvarnih bajtova).
                     </li>
                 </ul>
             ),
