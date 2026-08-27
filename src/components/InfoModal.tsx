@@ -3,6 +3,17 @@ import { useT, type TFunction } from '../i18n/index';
 import Card from './info/Card';
 import Section from './info/Section';
 import type { AppPhase } from '../hooks/useAppPhase';
+import { useTheme } from '../theme';
+
+const ACCENTS: Record<string, { dark: string; light: string }> = {
+  cyan: { dark: '#00d4ff', light: '#026a8c' },
+  indigo: { dark: '#667eea', light: '#3f4ba8' },
+  bitcoin: { dark: '#f7931a', light: '#a35c00' },
+  git: { dark: '#9b7fc6', light: '#6b4fa0' },
+  bittorrent: { dark: '#58d033', light: '#3d7f1c' },
+  amber: { dark: '#ffd479', light: '#8a4b00' },
+  pink: { dark: '#ff6b9f', light: '#b0356a' },
+};
 
 const SYSTEM_COLORS: Record<string, string> = {
   general: '#00d4ff',
@@ -23,6 +34,8 @@ interface InfoModalProps {
 
 export default function InfoModal({ open, onClose, phase, activeSystemId }: InfoModalProps) {
   const t = useT();
+  const { theme } = useTheme();
+  const accentFor = (key: string) => ACCENTS[key]![theme === 'light' ? 'light' : 'dark'];
   const [tab, setTab] = useState<Tab>('general');
 
   // When the modal opens, default the tab to the active system (general while
@@ -77,10 +90,10 @@ export default function InfoModal({ open, onClose, phase, activeSystemId }: Info
         </div>
 
         <div className="info-modal-body">
-          {tab === 'general' && <GeneralTab t={t} />}
-          {tab === 'bitcoin' && <SystemTab t={t} system="bitcoin" accent="#f7931a" title="Bitcoin" />}
-          {tab === 'git' && <SystemTab t={t} system="git" accent="#9b7fc6" title="Git" />}
-          {tab === 'bittorrent' && <SystemTab t={t} system="bittorrent" accent="#58d033" title="BitTorrent" />}
+          {tab === 'general' && <GeneralTab t={t} accentFor={accentFor} />}
+          {tab === 'bitcoin' && <SystemTab t={t} system="bitcoin" accent={accentFor('bitcoin')} title="Bitcoin" />}
+          {tab === 'git' && <SystemTab t={t} system="git" accent={accentFor('git')} title="Git" />}
+          {tab === 'bittorrent' && <SystemTab t={t} system="bittorrent" accent={accentFor('bittorrent')} title="BitTorrent" />}
         </div>
 
         <div className="info-modal-footer">
@@ -96,15 +109,15 @@ interface TabProps {
   t: TFunction;
 }
 
-function GeneralTab({ t }: TabProps) {
+function GeneralTab({ t, accentFor }: TabProps & { accentFor: (key: string) => string }) {
   const cards: Array<{ accent: string; title: ReactNode; body: ReactNode }> = [
-    { accent: '#00d4ff', title: t('info.general.what_is_merkle_title') as ReactNode, body: t('info.general.what_is_merkle') as ReactNode },
-    { accent: '#667eea', title: t('info.general.what_app_does_title') as ReactNode, body: t('info.general.what_app_does') as ReactNode },
-    { accent: '#f7931a', title: t('info.general.three_systems_title') as ReactNode, body: t('info.general.three_systems') as ReactNode },
-    { accent: '#9b7fc6', title: t('info.general.tree_vs_dag_title') as ReactNode, body: t('info.general.tree_vs_dag') as ReactNode },
-    { accent: '#58d033', title: t('info.general.architecture_title') as ReactNode, body: t('info.general.architecture') as ReactNode },
-    { accent: '#ffd479', title: t('info.general.merkle_core_title') as ReactNode, body: t('info.general.merkle_core') as ReactNode },
-    { accent: '#ff6b9f', title: t('info.general.scene_proof_title') as ReactNode, body: t('info.general.scene_proof') as ReactNode },
+    { accent: accentFor('cyan'), title: t('info.general.what_is_merkle_title') as ReactNode, body: t('info.general.what_is_merkle') as ReactNode },
+    { accent: accentFor('indigo'), title: t('info.general.what_app_does_title') as ReactNode, body: t('info.general.what_app_does') as ReactNode },
+    { accent: accentFor('bitcoin'), title: t('info.general.three_systems_title') as ReactNode, body: t('info.general.three_systems') as ReactNode },
+    { accent: accentFor('git'), title: t('info.general.tree_vs_dag_title') as ReactNode, body: t('info.general.tree_vs_dag') as ReactNode },
+    { accent: accentFor('bittorrent'), title: t('info.general.architecture_title') as ReactNode, body: t('info.general.architecture') as ReactNode },
+    { accent: accentFor('amber'), title: t('info.general.merkle_core_title') as ReactNode, body: t('info.general.merkle_core') as ReactNode },
+    { accent: accentFor('pink'), title: t('info.general.scene_proof_title') as ReactNode, body: t('info.general.scene_proof') as ReactNode },
   ];
   return (
     <div className="info-cards-grid">

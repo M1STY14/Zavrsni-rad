@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import './App.css';
 import AppShell from './components/AppShell';
 import { LanguageProvider } from './i18n/index';
+import { ThemeProvider } from './theme';
 
 // Single client for the app's lifetime. Default staleTime of 60s means repeat
 // fetches within a minute return from cache — the proof flow benefits the most
@@ -17,9 +18,11 @@ export default function App() {
     return (
         <QueryClientProvider client={queryClient}>
             <LanguageProvider>
-                <div className="App">
-                    <AppShell />
-                </div>
+                <ThemeProvider>
+                    <div className="App">
+                        <AppShell />
+                    </div>
+                </ThemeProvider>
             </LanguageProvider>
         </QueryClientProvider>
     );

@@ -1,6 +1,7 @@
 import React, { useRef, useMemo, useState, useEffect, useCallback } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Text, Stars } from '@react-three/drei';
+import { useTheme } from '../theme';
 import { useSpring, animated } from '@react-spring/three';
 import * as THREE from 'three';
 import { getTreeDepth, getTreeStats } from '../utils/merkle';
@@ -17,6 +18,10 @@ const REVEAL_MS_PER_LEVEL = 650;
 // connections, keyed by world-space position; cull anything outside the
 // camera frustum / beyond a depth-of-detail threshold. This is the natural
 // follow-up to the click-to-expand collapsing landed alongside this comment.
+
+let SCENE_THEME = 'dark';
+const labelColor = () => (SCENE_THEME === 'light' ? '#0f172a' : '#ffffff');
+const labelOutlineColor = () => (SCENE_THEME === 'light' ? '#ffffff' : '#000000');
 
 // Fractal tree layout constants
 const SPREAD_ANGLE = 0.56;
@@ -326,7 +331,7 @@ function ExploringTreeNode({ position, hash, depth, onClick, proofHighlight, col
           anchorX="center"
           anchorY="middle"
           outlineWidth={0.04}
-          outlineColor="#000000"
+          outlineColor={labelOutlineColor()}
         >
           {isExpanding ? 'expanding...' : `+${leafCount} txs`}
         </Text>
@@ -336,11 +341,11 @@ function ExploringTreeNode({ position, hash, depth, onClick, proofHighlight, col
         <Text
           position={[0, 1.0, 0]}
           fontSize={0.25}
-          color="#ffffff"
+          color={labelColor()}
           anchorX="center"
           anchorY="middle"
           outlineWidth={0.03}
-          outlineColor="#000000"
+          outlineColor={labelOutlineColor()}
         >
           {hash.substring(0, 8)}...
         </Text>
@@ -350,11 +355,11 @@ function ExploringTreeNode({ position, hash, depth, onClick, proofHighlight, col
         <Text
           position={[0, -0.8, 0]}
           fontSize={0.2}
-          color="#ffffff"
+          color={labelColor()}
           anchorX="center"
           anchorY="middle"
           outlineWidth={0.03}
-          outlineColor="#000000"
+          outlineColor={labelOutlineColor()}
         >
           click to expand
         </Text>
@@ -721,11 +726,11 @@ function BlockLabel({ position, height }) {
     <Text
       position={position}
       fontSize={0.8}
-      color="#ffffff"
+      color={labelColor()}
       anchorX="center"
       anchorY="middle"
       outlineWidth={0.04}
-      outlineColor="#000000"
+      outlineColor={labelOutlineColor()}
       transparent
       opacity={0.6}
     >
@@ -735,7 +740,8 @@ function BlockLabel({ position, height }) {
 }
 
 // Main scene component
-function Scene({ phase, treeData, proofHighlight, onNodeClick, onExpandCollapsed, expandingHashes, isMobile, onTransitionComplete, neighborBlocks, blockHeight, resetTrigger }) {
+function Scene({ theme = 'dark', phase, treeData, proofHighlight, onNodeClick, onExpandCollapsed, expandingHashes, isMobile, onTransitionComplete, neighborBlocks, blockHeight, resetTrigger }) {
+  SCENE_THEME = theme;
   const groupRef = useRef();
   const controlsRef = useRef();
   const particleCount = isMobile ? 100 : 300;
@@ -841,16 +847,20 @@ function Scene({ phase, treeData, proofHighlight, onNodeClick, onExpandCollapsed
   return (
     <>
       {/* Lighting */}
-      <ambientLight intensity={0.4} />
+      <ambientLight intensity={theme === 'light' ? 0.95 : 0.4} />
       <directionalLight position={[10, 10, 5]} intensity={0.6} color="#ffffff" />
       <pointLight position={[0, 5, 10]} intensity={1.2} color="#00d4ff" />
       <pointLight position={[-8, -5, -5]} intensity={0.8} color="#667eea" />
       <pointLight position={[8, -5, -5]} intensity={0.8} color="#764ba2" />
-      <hemisphereLight skyColor="#00d4ff" groundColor="#0a0a1a" intensity={0.3} />
+      <hemisphereLight skyColor="#00d4ff" groundColor={theme === 'light' ? '#e6ecf5' : '#0a0a1a'} intensity={theme === 'light' ? 0.6 : 0.3} />
 
-      {/* Background */}
-      <Stars radius={100} depth={50} count={starCount} factor={4} saturation={0} fade speed={1} />
-      <Particles count={particleCount} />
+      {/* Stars and particles only in the dark theme — on a light backdrop they read as dirt. */}
+      {theme !== 'light' && (
+        <>
+          <Stars radius={100} depth={50} count={starCount} factor={4} saturation={0} fade speed={1} />
+          <Particles count={particleCount} />
+        </>
+      )}
 
       {/* Camera controller */}
       <CameraController
@@ -997,6 +1007,7 @@ export default function MerkleScene3D({
   neighborBlocks = [],
   blockHeight = null,
 }) {
+  const { theme } = useTheme();
   const [notification, setNotification] = useState(null);
   const [resetTrigger, setResetTrigger] = useState(0);
 
@@ -1011,9 +1022,10 @@ export default function MerkleScene3D({
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <Canvas
         camera={{ position: [0, 0, 28], fov: 60 }}
-        style={{ background: 'linear-gradient(to bottom, #000000, #0a0a1a)' }}
+        style={{ background: 'var(--bg-gradient)' }}
       >
         <Scene
+          theme={theme}
           phase={phase}
           treeData={treeData}
           proofHighlight={proofHighlight}

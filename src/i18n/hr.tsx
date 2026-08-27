@@ -28,6 +28,11 @@ const hr = {
         webgl_unavailable:
             'WebGL nije dostupan u ovom pregledniku — prikazan je pojednostavljeni 2D prikaz. Uključite hardversko ubrzanje za 3D vizualizaciju.',
     },
+    theme: {
+        toggle_title: 'Prebaci svijetlu i tamnu temu',
+        light: 'Svijetla',
+        dark: 'Tamna',
+    },
     panel: {
         title: 'Merkle stablo',
         expand_title: 'Proširi',

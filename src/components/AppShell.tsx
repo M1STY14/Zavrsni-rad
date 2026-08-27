@@ -9,6 +9,7 @@ import CloningModal from './modals/CloningModal';
 import BlockFetchingModal from './modals/BlockFetchingModal';
 import LanguageSwitcher from './LanguageSwitcher';
 import ViewModeToggle, { type ViewMode } from './ViewModeToggle';
+import ThemeToggle from './ThemeToggle';
 import WebGLBanner from './WebGLBanner';
 import ClickHintToast from './ClickHintToast';
 import TruncationBanner from './TruncationBanner';
@@ -205,6 +206,8 @@ export default function AppShell() {
       <LanguageSwitcher phase={phase.phase} />
 
       <ViewModeToggle mode={viewMode} onChange={setViewMode} disabled={!webglAvailable} />
+
+      <ThemeToggle phase={phase.phase} />
 
       <WebGLBanner visible={!webglAvailable} />
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { TreeNode } from '../types/tree';
 import { DEMO_TREE } from '../data/demo';
+import { useTheme } from '../theme';
 import type { ProofHighlight } from '../hooks/useProofClick';
 
 // A flat, traditional 2D rendering of the Merkle tree: straight diagonal links
@@ -232,6 +233,13 @@ export default function MerkleScene2D({
         return () => svg.removeEventListener('wheel', onWheel);
     }, []);
 
+    const { theme } = useTheme();
+    const isLight = theme === 'light';
+    const nodeStroke = isLight ? '#ffffff' : '#0a0a1a';
+    const labelColor = isLight ? '#0f172a' : '#ffffff';
+    const labelColorDim = isLight ? 'rgba(15, 23, 42, 0.6)' : 'rgba(255,255,255,0.55)';
+    const linkColor = isLight ? 'rgba(2, 119, 158, 0.45)' : 'rgba(0, 212, 255, 0.35)';
+
     const [hovered, setHovered] = useState<string | null>(null);
 
     const handleNodeActivate = useCallback(
@@ -271,7 +279,7 @@ export default function MerkleScene2D({
                                 y1={n.parent.y}
                                 x2={n.x}
                                 y2={n.y}
-                                stroke={onPath ? '#ffa726' : 'rgba(0, 212, 255, 0.35)'}
+                                stroke={onPath ? '#ffa726' : linkColor}
                                 strokeWidth={onPath ? 3 : 1.5}
                             />
                         );
@@ -305,7 +313,7 @@ export default function MerkleScene2D({
                                 <circle
                                     r={r}
                                     fill={color}
-                                    stroke="#0a0a1a"
+                                    stroke={nodeStroke}
                                     strokeWidth={2}
                                 />
                                 {/* Collapsed nodes always show their tx count. */}
@@ -327,7 +335,7 @@ export default function MerkleScene2D({
                                         y={r + 16}
                                         textAnchor="middle"
                                         fontSize={11}
-                                        fill={hovered === n.id ? '#ffffff' : 'rgba(255,255,255,0.55)'}
+                                        fill={hovered === n.id ? labelColor : labelColorDim}
                                     >
                                         {hovered === n.id ? `${n.hash.substring(0, 16)}…` : n.hash.substring(0, 8)}
                                     </text>

@@ -28,6 +28,11 @@ const en = {
         webgl_unavailable:
             'WebGL is unavailable in this browser — showing the simplified 2D view. Enable hardware acceleration for the 3D visualization.',
     },
+    theme: {
+        toggle_title: 'Toggle light and dark theme',
+        light: 'Light',
+        dark: 'Dark',
+    },
     panel: {
         title: 'Merkle Tree',
         expand_title: 'Expand',
